@@ -118,25 +118,60 @@
   .login-wrap input { width:100%; padding:10px; font-size:0.95rem; }
   .login-err { background:#fdecea; color:#a02020; border-radius:6px; padding:10px 12px; font-size:0.8rem; margin-top:12px; display:none; }
 
+  /* ── Tageskarten (Mobil-Ansicht Zeiterfassung) ── */
+  .day-cards { display: flex; flex-direction: column; gap: 10px; }
+  .day-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); padding: 10px 12px; border-left: 5px solid #f0ad00; }
+  .day-card.best { border-left-color: #28a745; }
+  .day-card.t-offday { background: #faf5ff; }
+  .day-card.t-frei { background: #f1f1f1; border-left-color: #c9c9c9; }
+  .dc-head { display: flex; gap: 8px; align-items: center; }
+  .dc-date { font-weight: 800; white-space: nowrap; min-width: 78px; line-height: 1.15; }
+  .dc-date small { display: block; font-weight: 600; font-size: 0.68rem; color: #888; }
+  .dc-date.we, .dc-date.we small { color: #c0392b; }
+  .dc-head select { flex: 1; min-width: 0; }
+  .dc-task { width: 100%; margin-top: 8px; }
+  .dc-row { display: grid; gap: 6px; margin-top: 8px; }
+  .dc-row.times { grid-template-columns: repeat(4, 1fr); }
+  .dc-row.meta { grid-template-columns: 1.1fr 1fr 0.9fr 1fr; }
+  .dc-row label { display: flex; flex-direction: column; gap: 3px; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.3px; color: #889; min-width: 0; }
+  .dc-row input, .dc-row select { width: 100%; text-align: center; padding: 7px 4px; }
+  .dc-row .dc-val { font-size: 0.95rem; font-weight: 800; color: #2c5f8a; padding: 7px 0; text-align: center; white-space: nowrap; }
+  .dc-row .dc-val.pe { color: #a85400; }
+  .dc-row .dc-val.sp { color: #155724; }
+  .aus-card { background: #fff; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.10); padding: 10px 12px; margin-bottom: 10px; }
+  .aus-card .dc-row.a1 { grid-template-columns: 92px 1fr; margin-top: 0; }
+  .aus-card .dc-row.a2 { grid-template-columns: 1fr 1fr 1fr 44px; align-items: end; }
+  .aus-card .dc-row input { text-align: left; }
+  .aus-card .btn.red { padding: 8px 0; width: 100%; }
+
   /* ── Mobile ── */
   @media (max-width: 760px) {
-    header { padding: 12px 14px; }
-    header h1 { font-size: 1.05rem; }
-    .logo { font-size: 1.1rem; }
-    .month-tabs { padding: 0 6px; }
-    .month-tabs button { padding: 11px 14px; font-size: 0.85rem; flex: 1; }
-    .sub-tabs { padding: 0 4px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
-    .sub-tabs button { padding: 11px 10px; font-size: 0.78rem; white-space: nowrap; flex: none; }
-    .container { padding: 12px 8px 80px; }
+    header { padding: 10px 12px; }
+    header h1 { font-size: 0.98rem; }
+    header p { font-size: 0.7rem; }
+    .logo { display: none; }
+    .month-tabs { padding: 0; position: sticky; top: 0; z-index: 60; }
+    .month-tabs button { padding: 12px 8px; font-size: 0.88rem; flex: 1; }
+    .sub-tabs { padding: 0 2px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; position: sticky; top: 45px; z-index: 60; scrollbar-width: none; }
+    .sub-tabs::-webkit-scrollbar { display: none; }
+    .sub-tabs button { padding: 12px 11px; font-size: 0.8rem; white-space: nowrap; flex: none; }
+    .container { padding: 12px 8px 90px; }
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -8px; padding: 0 8px; }
     .table-scroll table.grid { min-width: 720px; }
     .table-scroll table.grid.xwide { min-width: 1080px; }
     /* 16px verhindert Auto-Zoom beim Fokussieren auf iOS */
     input, select, textarea { font-size: 16px; }
+    .dc-row input, .dc-row select { padding: 9px 2px; }
     .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .kpi .v { font-size: 1.05rem; }
+    .kpi { padding: 10px 12px; }
+    .kpi .v { font-size: 1.02rem; }
     .panel { padding: 14px 12px; }
     .login-wrap { margin: 24px 10px; }
+    .toolbar .btn { flex: 1 1 auto; text-align: center; }
+    .hotel-edit, .he-head { grid-template-columns: 1fr; }
+    .hint { font-size: 0.74rem; }
+    .calc td { padding: 8px 6px; font-size: 0.84rem; }
+    .calc input.num { width: 110px; }
   }
 </style>
 </head>
@@ -380,6 +415,16 @@ window.addEventListener('beforeunload', function(e) {
   if (dirty) { e.preventDefault(); e.returnValue = ''; }
 });
 
+/* Mobil-Erkennung: unter 760 px werden Karten statt Tabellen gerendert */
+function isMobile() {
+  try { return window.innerWidth <= 760; } catch(e) { return false; }
+}
+let lastMobile = isMobile();
+window.addEventListener('resize', function() {
+  const m = isMobile();
+  if (m !== lastMobile) { lastMobile = m; render(); }
+});
+
 /* ════════════════════════ HELPER ════════════════════════ */
 function pMin(t) { // "HH:MM" -> Minuten, null bei leer/ungültig
   if (!t) return null;
@@ -505,6 +550,72 @@ function renderZeit() {
   const meta = monthMeta(curMonth);
   const m = state.months[curMonth];
   const sums = monthSums(curMonth);
+
+  const kpis = `
+  <div class="kpi-row">
+    <div class="kpi green"><div class="v">${fDur(sums.minB)}</div><div class="l">Std. bestätigt (${sums.tageB} Tage)</div></div>
+    <div class="kpi gold"><div class="v">${fDur(sums.minG)}</div><div class="l">Std. geplant/offen (${sums.tageG} Tage)</div></div>
+    <div class="kpi green"><div class="v">${eur(sums.spB)}</div><div class="l">Spesen bestätigt</div></div>
+    <div class="kpi gold"><div class="v">${eur(sums.spG)}</div><div class="l">Spesen geplant/offen</div></div>
+    <div class="kpi"><div class="v">${eur(sums.auslagen)}</div><div class="l">Auslagen</div></div>
+  </div>`;
+
+  if (isMobile()) {
+    let cards = '';
+    m.days.forEach((d, i) => {
+      const c = dayCalc(d);
+      const date = new Date(meta.year, meta.num-1, d.tag);
+      const wd = date.getDay();
+      const we = (wd===0||wd===6);
+      const timesOff = (d.typ==='offday' || d.typ==='frei');
+      const typSel = `<select onchange="updDay(${i},'typ',this.value)">
+          <option value="einsatz" ${d.typ==='einsatz'?'selected':''}>Einsatz</option>
+          <option value="reise" ${d.typ==='reise'?'selected':''}>Reisetag</option>
+          <option value="offday" ${d.typ==='offday'?'selected':''}>Offday 6h</option>
+          <option value="frei" ${d.typ==='frei'?'selected':''}>Frei/Zuhause</option>
+        </select>`;
+      const statusSel = d.typ==='frei' ? '' :
+        `<select onchange="updDay(${i},'status',this.value)" style="max-width:118px;">
+          <option value="geplant" ${d.status==='geplant'?'selected':''}>geplant</option>
+          <option value="bestaetigt" ${d.status==='bestaetigt'?'selected':''}>bestätigt ✓</option>
+        </select>`;
+      let body = `<input class="dc-task" value="${esc(d.taetigkeit)}" placeholder="Tätigkeit / Route" onchange="updDay(${i},'taetigkeit',this.value)">`;
+      if (d.typ !== 'frei') {
+        if (!timesOff) {
+          body += `<div class="dc-row times">
+            <label>Start<input value="${esc(d.start)}" placeholder="07:00" onchange="updDay(${i},'start',this.value)"></label>
+            <label>Ende<input value="${esc(d.ende)}" placeholder="17:00" onchange="updDay(${i},'ende',this.value)"></label>
+            <label>Pause<input value="${esc(d.pause)}" placeholder="0:45" onchange="updDay(${i},'pause',this.value)"></label>
+            <label>Ende m. P.<span class="dc-val pe">${fMin(c.endeMitPause)}</span></label>
+          </div>`;
+        }
+        body += `<div class="dc-row meta">
+          <label>Land<select onchange="updDay(${i},'land',this.value)">${state.rates.map(r=>`<option value="${r.code}" ${d.land===r.code?'selected':''}>${r.flag} ${r.code}</option>`).join('')}</select></label>
+          <label>Frühstück<select onchange="updDay(${i},'frueh',this.value)"><option value="ohne" ${d.frueh==='ohne'?'selected':''}>ohne</option><option value="mit" ${d.frueh==='mit'?'selected':''}>mit</option></select></label>
+          <label>Std. netto<span class="dc-val">${d.typ==='frei'?'–':fDur(c.minNetto)}</span></label>
+          <label>Spesen ✎<span class="dc-val sp" onclick="spesenOverrideAt(${i})">${eur(c.spesen)}${d.spesenOverride!==''&&d.spesenOverride!=null?' *':''}</span></label>
+        </div>`;
+      }
+      cards += `<div class="day-card t-${d.typ} ${d.status==='bestaetigt'&&d.typ!=='frei'?'best':''}">
+        <div class="dc-head">
+          <span class="dc-date ${we?'we':''}">${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.<small>${WOCHENTAGE[wd]}</small></span>
+          ${typSel}${statusSel}
+        </div>
+        ${body}
+      </div>`;
+    });
+    return `${kpis}
+    <div class="toolbar">
+      <button class="btn small ghost" onclick="alleBestaetigen()">Alle Tage mit Zeiten bestätigen ✓</button>
+    </div>
+    <div class="day-cards">${cards}</div>
+    <div class="hint blue" style="margin-top:14px;">
+      <b>Regeln:</b> Std. netto = Ende − Start (Pause wird NICHT abgezogen, sondern auf die Ende-Zeit aufgeschlagen).
+      Frühstück „mit" = −20 % Spesen (außer DE). Spesen-Betrag antippen = manueller Override (* = aktiv).
+      Tag auf <b>bestätigt ✓</b> stellen, sobald die Zeiten final sind – nur bestätigte Tage fließen in die Abrechnung.
+    </div>`;
+  }
+
   let rows = '';
   m.days.forEach((d, i) => {
     const c = dayCalc(d);
@@ -537,14 +648,7 @@ function renderZeit() {
     </tr>`;
   });
 
-  return `
-  <div class="kpi-row">
-    <div class="kpi green"><div class="v">${fDur(sums.minB)}</div><div class="l">Std. bestätigt (${sums.tageB} Tage)</div></div>
-    <div class="kpi gold"><div class="v">${fDur(sums.minG)}</div><div class="l">Std. geplant/offen (${sums.tageG} Tage)</div></div>
-    <div class="kpi green"><div class="v">${eur(sums.spB)}</div><div class="l">Spesen bestätigt</div></div>
-    <div class="kpi gold"><div class="v">${eur(sums.spG)}</div><div class="l">Spesen geplant/offen</div></div>
-    <div class="kpi"><div class="v">${eur(sums.auslagen)}</div><div class="l">Auslagen</div></div>
-  </div>
+  return `${kpis}
   <div class="hint blue">
     <b>Regeln:</b> Std. netto = Ende − Start (Pause wird NICHT abgezogen). Die Pause (Standard 0:45) wird auf die Ende-Zeit aufgeschlagen → Spalte „Ende mit Pause".
     Offday/Pauschal-Reisetag = 6:00 h ohne Zeiten. Frühstück „mit" = −20 % Spesen (außer DE: kein Abzug). Spesen-Markierung „*" = manueller Override.
@@ -590,17 +694,19 @@ function alleBestaetigen() {
   });
   save(); render();
 }
-function spesenOverridePrompt(ev) {
-  const cell = ev.target.closest('td');
-  if (!cell || !cell.classList.contains('spesen-val')) return;
-  const tr = cell.closest('tr');
-  const idx = Array.from(tr.parentNode.children).indexOf(tr);
+function spesenOverrideAt(idx) {
   const d = state.months[curMonth].days[idx];
   const cur = d.spesenOverride;
   const val = prompt('Spesen-Override für diesen Tag (leer = automatisch):', cur==null?'':cur);
   if (val === null) return;
   d.spesenOverride = val.trim()==='' ? '' : val.replace(',','.');
   save(); render();
+}
+function spesenOverridePrompt(ev) {
+  const cell = ev.target.closest('td');
+  if (!cell || !cell.classList.contains('spesen-val')) return;
+  const tr = cell.closest('tr');
+  spesenOverrideAt(Array.from(tr.parentNode.children).indexOf(tr));
 }
 
 /* ════════════════════════ RENDER: REISEPLAN ════════════════════════ */
@@ -645,6 +751,32 @@ function delHotel(i){ if(confirm('Hotel-Eintrag löschen?')){ state.months[curMo
 function renderAuslagen() {
   const m = state.months[curMonth];
   const meta = monthMeta(curMonth);
+
+  if (isMobile()) {
+    const sum = m.auslagen.reduce((x,a)=>x+(parseFloat(a.betrag)||0),0);
+    const cards = m.auslagen.map((a,i)=>`
+      <div class="aus-card">
+        <div class="dc-row a1">
+          <label>Datum<input value="${esc(a.datum)}" placeholder="TT.MM." onchange="updAusl(${i},'datum',this.value)"></label>
+          <label>Beschreibung<input value="${esc(a.beschreibung)}" placeholder="z. B. Waschstraße" onchange="updAusl(${i},'beschreibung',this.value)"></label>
+        </div>
+        <div class="dc-row a2">
+          <label>Ort<input value="${esc(a.ort)}" onchange="updAusl(${i},'ort',this.value)"></label>
+          <label>Zahlung<select onchange="updAusl(${i},'zahlung',this.value)">
+            <option value="Bar" ${a.zahlung==='Bar'?'selected':''}>Bar</option>
+            <option value="Karte" ${a.zahlung==='Karte'?'selected':''}>Karte</option>
+          </select></label>
+          <label>Betrag €<input inputmode="decimal" value="${esc(a.betrag)}" placeholder="0,00" onchange="updAusl(${i},'betrag',this.value.replace(',','.'))"></label>
+          <button class="btn small red" onclick="delAusl(${i})">✕</button>
+        </div>
+      </div>`).join('');
+    return `
+    <div class="hint blue">Auslagen (Waschstraße, Maut bar, Tickets, …) – werden netto erstattet. Belege aufbewahren!</div>
+    ${cards || '<div class="hint">Noch keine Auslagen für '+meta.name+' erfasst.</div>'}
+    <div class="kpi-row" style="grid-template-columns:1fr;"><div class="kpi"><div class="v">${eur(sum)}</div><div class="l">Gesamt Auslagen ${meta.name}</div></div></div>
+    <button class="btn green" style="width:100%;padding:12px;" onclick="addAusl()">+ Auslage hinzufügen</button>`;
+  }
+
   let rows = m.auslagen.map((a,i)=>`
     <tr>
       <td><input class="t" style="width:80px" value="${esc(a.datum)}" placeholder="TT.MM." onchange="updAusl(${i},'datum',this.value)"></td>
