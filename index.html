@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOLLOWRED – Zeiterfassung & Reiseplan Juni–August 2026</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1a3a5c">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; font-size: 14px; }
+
+  header { background: #1a3a5c; color: #fff; padding: 18px 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  header h1 { font-size: 1.3rem; font-weight: 600; }
+  header p { font-size: 0.8rem; color: #a8c4e0; margin-top: 3px; }
+  .logo { font-size: 1.4rem; font-weight: 900; letter-spacing: 2px; color: #fff; }
+
+  .month-tabs { display: flex; background: #132d47; padding: 0 20px; flex-wrap: wrap; }
+  .month-tabs button { padding: 13px 26px; border: none; background: transparent; color: #a8c4e0; font-size: 0.95rem; font-weight: 700; cursor: pointer; border-bottom: 3px solid transparent; }
+  .month-tabs button.active { color: #fff; border-bottom-color: #5ba3d9; background: rgba(255,255,255,0.08); }
+  .month-tabs button:hover { color: #fff; }
+
+  .sub-tabs { display: flex; background: #fff; border-bottom: 2px solid #e0e6ee; padding: 0 20px; flex-wrap: wrap; }
+  .sub-tabs button { padding: 11px 18px; border: none; background: transparent; color: #666; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; }
+  .sub-tabs button.active { color: #2c5f8a; border-bottom-color: #2c5f8a; }
+
+  .container { max-width: 1320px; margin: 0 auto; padding: 18px 16px 60px; }
+
+  table.grid { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  table.grid thead tr { background: #2c5f8a; color: #fff; }
+  table.grid thead th { padding: 9px 8px; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; text-align: left; letter-spacing: 0.3px; }
+  table.grid tbody tr { border-bottom: 1px solid #e8ecf0; }
+  table.grid tbody td { padding: 6px 8px; font-size: 0.85rem; vertical-align: middle; }
+  table.grid tbody tr.r-offday { background: #faf5ff; }
+  table.grid tbody tr.r-frei { background: #f6f6f6; color: #999; }
+  table.grid tbody tr.r-geplant td:first-child { border-left: 4px solid #f0ad00; }
+  table.grid tbody tr.r-bestaetigt td:first-child { border-left: 4px solid #28a745; }
+  table.grid tfoot tr { background: #1a3a5c; color: #fff; }
+  table.grid tfoot td { padding: 11px 8px; font-weight: 700; font-size: 0.85rem; }
+
+  input, select, textarea { font-family: inherit; font-size: 0.84rem; padding: 4px 6px; border: 1px solid #ccd6e0; border-radius: 5px; background: #fff; color: #222; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #5ba3d9; border-color: #5ba3d9; }
+  input.t { width: 64px; text-align: center; }
+  input.w-full { width: 100%; }
+  input.num { width: 90px; text-align: right; }
+  input[readonly] { background: #f2f5f8; color: #555; border-style: dashed; }
+  .computed { font-weight: 700; color: #2c5f8a; white-space: nowrap; }
+  .computed.pausenende { color: #a85400; }
+  .spesen-val { font-weight: 700; color: #155724; white-space: nowrap; }
+
+  .wd { font-size: 0.7rem; color: #888; display: block; }
+  .dat { font-weight: 700; white-space: nowrap; }
+  .dat.we { color: #c0392b; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
+  .b-best { background: #d4edda; color: #155724; }
+  .b-gepl { background: #fff3cd; color: #856404; }
+
+  .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 6px; font-size: 0.84rem; font-weight: 700; cursor: pointer; background: #2c5f8a; color: #fff; }
+  .btn:hover { background: #1a3a5c; }
+  .btn.green { background: #28a745; }
+  .btn.green:hover { background: #1d7a33; }
+  .btn.gold { background: #b8860b; }
+  .btn.red { background: #c0392b; }
+  .btn.ghost { background: #eef3f8; color: #2c5f8a; }
+  .btn.small { padding: 4px 9px; font-size: 0.74rem; }
+  .toolbar { display: flex; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; align-items: center; }
+
+  .panel { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); padding: 18px 22px; margin-bottom: 18px; }
+  .panel h3 { font-size: 1rem; color: #1a3a5c; margin-bottom: 12px; border-bottom: 1px solid #e8ecf0; padding-bottom: 8px; }
+
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); padding: 13px 16px; }
+  .kpi .v { font-size: 1.25rem; font-weight: 800; color: #1a3a5c; }
+  .kpi .l { font-size: 0.72rem; color: #888; text-transform: uppercase; margin-top: 3px; }
+  .kpi.green .v { color: #155724; }
+  .kpi.gold .v { color: #856404; }
+  .kpi.purple .v { color: #5a1a8a; }
+
+  .hint { background: #fff8e8; border-left: 4px solid #f0ad00; padding: 10px 14px; font-size: 0.8rem; color: #664d03; border-radius: 0 6px 6px 0; margin-bottom: 14px; }
+  .hint.blue { background: #eaf3fb; border-left-color: #2980b9; color: #1a5799; }
+  .hint.green { background: #eafaf1; border-left-color: #27ae60; color: #1a7a40; }
+
+  /* Abrechnung */
+  .calc { width: 100%; border-collapse: collapse; }
+  .calc td { padding: 8px 10px; font-size: 0.9rem; border-bottom: 1px solid #f0f0f0; }
+  .calc td:last-child { text-align: right; font-weight: 700; white-space: nowrap; }
+  .calc tr.sum td { background: #eaf1f8; color: #1a3a5c; border-top: 2px solid #2c5f8a; font-weight: 700; }
+  .calc tr.total td { background: #1a3a5c; color: #fff; font-size: 1rem; font-weight: 800; }
+  .calc tr.gold td { background: #fff8e8; color: #856404; font-weight: 700; }
+  .calc tr.red td { color: #7a0000; }
+  .calc tr.green td { color: #155724; }
+
+  /* Reiseplan editor */
+  .rp-table td input { width: 100%; }
+  .hotel-edit { border: 1px solid #e0e6ee; border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #fafcfe; display: grid; grid-template-columns: 130px 1fr 1fr 90px 110px 110px 36px; gap: 8px; align-items: center; }
+  .hotel-edit input, .hotel-edit select { width: 100%; }
+  .he-head { display: grid; grid-template-columns: 130px 1fr 1fr 90px 110px 110px 36px; gap: 8px; font-size: 0.7rem; color: #888; text-transform: uppercase; padding: 0 13px; margin-bottom: 4px; }
+
+  @media (max-width: 900px) {
+    .hotel-edit, .he-head { grid-template-columns: 1fr 1fr; }
+    .he-head { display: none; }
+  }
+
+  /* ── Sync-Status & Login ── */
+  .sync-chip { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:14px; font-size:0.74rem; font-weight:700; background:rgba(255,255,255,0.12); color:#a8c4e0; cursor:default; white-space:nowrap; }
+  .sync-chip .dot { width:9px; height:9px; border-radius:50%; background:#888; flex:none; }
+  .sync-chip.ok .dot { background:#3ddc84; }
+  .sync-chip.pending .dot { background:#f0ad00; animation: syncpulse 1s infinite; }
+  .sync-chip.error .dot { background:#ff5c5c; }
+  .sync-chip.local .dot { background:#aaa; }
+  @keyframes syncpulse { 50% { opacity: 0.3; } }
+
+  .login-wrap { max-width: 460px; margin: 60px auto; background:#fff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.12); padding:28px; }
+  .login-wrap h2 { color:#1a3a5c; font-size:1.15rem; margin-bottom:6px; }
+  .login-wrap p { font-size:0.82rem; color:#666; margin-bottom:16px; line-height:1.5; }
+  .login-wrap label { display:block; font-size:0.72rem; text-transform:uppercase; color:#888; margin:12px 0 4px; }
+  .login-wrap input { width:100%; padding:10px; font-size:0.95rem; }
+  .login-err { background:#fdecea; color:#a02020; border-radius:6px; padding:10px 12px; font-size:0.8rem; margin-top:12px; display:none; }
+
+  /* ── Mobile ── */
+  @media (max-width: 760px) {
+    header { padding: 12px 14px; }
+    header h1 { font-size: 1.05rem; }
+    .logo { font-size: 1.1rem; }
+    .month-tabs { padding: 0 6px; }
+    .month-tabs button { padding: 11px 14px; font-size: 0.85rem; flex: 1; }
+    .sub-tabs { padding: 0 4px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .sub-tabs button { padding: 11px 10px; font-size: 0.78rem; white-space: nowrap; flex: none; }
+    .container { padding: 12px 8px 80px; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -8px; padding: 0 8px; }
+    .table-scroll table.grid { min-width: 720px; }
+    .table-scroll table.grid.xwide { min-width: 1080px; }
+    /* 16px verhindert Auto-Zoom beim Fokussieren auf iOS */
+    input, select, textarea { font-size: 16px; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .kpi .v { font-size: 1.05rem; }
+    .panel { padding: 14px 12px; }
+    .login-wrap { margin: 24px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Zeiterfassung &amp; Reiseplan – Juni / Juli / August 2026</h1>
+    <p id="headerSub">Daten werden verschlüsselt von GitHub geladen</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span class="sync-chip local" id="syncChip" title="Synchronisierungs-Status"><span class="dot"></span><span id="syncChipText">–</span></span>
+    <div class="logo">FOLLOWRED</div>
+  </div>
+</header>
+
+<div class="month-tabs" id="monthTabs"></div>
+<div class="sub-tabs" id="subTabs"></div>
+<div class="container" id="main"></div>
+
+<script>
+'use strict';
+
+/* ════════════════════════ KONFIG ════════════════════════ */
+const STORAGE_KEY = 'followred_zeiterfassung_sommer2026_v1';
+const STUNDENLOHN_DEFAULT = 20.00;
+
+const DEFAULT_RATES = [
+  { code:'DE',  label:'Deutschland Volltag',    flag:'🇩🇪', rate:28.00, fruehAbzug:false },
+  { code:'DEA', label:'Deutschland An-/Abreise',flag:'🇩🇪', rate:14.00, fruehAbzug:false },
+  { code:'PL',  label:'Polen',                  flag:'🇵🇱', rate:29.00, fruehAbzug:true },
+  { code:'SK',  label:'Slowakei',               flag:'🇸🇰', rate:33.00, fruehAbzug:true },
+  { code:'HU',  label:'Ungarn',                 flag:'🇭🇺', rate:32.00, fruehAbzug:true },
+  { code:'RO',  label:'Rumänien',               flag:'🇷🇴', rate:27.00, fruehAbzug:true },
+  { code:'ROB', label:'Rumänien (Bukarest)',    flag:'🇷🇴', rate:32.00, fruehAbzug:true },
+  { code:'BG',  label:'Bulgarien',              flag:'🇧🇬', rate:22.00, fruehAbzug:true },
+  { code:'IT',  label:'Italien',                flag:'🇮🇹', rate:42.00, fruehAbzug:true },
+  { code:'FR',  label:'Frankreich',             flag:'🇫🇷', rate:53.00, fruehAbzug:true },
+  { code:'CH',  label:'Schweiz',                flag:'🇨🇭', rate:64.00, fruehAbzug:true },
+  { code:'AT',  label:'Österreich',             flag:'🇦🇹', rate:50.00, fruehAbzug:true },
+  { code:'SI',  label:'Slowenien',              flag:'🇸🇮', rate:38.00, fruehAbzug:true },
+  { code:'CZ',  label:'Tschechien',             flag:'🇨🇿', rate:32.00, fruehAbzug:true }
+];
+
+const SV = [
+  { key:'kv', label:'KV-Beitrag (AN-Anteil 8,79 %)', satz:0.0879 },
+  { key:'rv', label:'RV-Beitrag (9,30 %)', satz:0.0930 },
+  { key:'av', label:'AV-Beitrag (1,30 %)', satz:0.0130 },
+  { key:'pv', label:'PV-Beitrag kinderlos (2,40 %)', satz:0.0240 }
+];
+
+/* Stammdaten (Name, IBAN, Steuer-ID, …) liegen NICHT im Code –
+   sie kommen mit dem Daten-State aus dem privaten GitHub-Repo (state.stamm). */
+function getStamm() {
+  return state && state.stamm ? state.stamm : { name:'', adresse:'', pnr:'', geb:'', stkl:'', eintritt:'', steuerId:'', svNr:'', kk:'', bank:'', iban:'' };
+}
+
+const MONTHS = [
+  { id:'juni',   name:'Juni',   num:6, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0 },
+  { id:'juli',   name:'Juli',   num:7, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0 },
+  { id:'august', name:'August', num:8, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0 }
+];
+
+const WOCHENTAGE = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+const WD_KURZ = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+/* ════════════════════════ DEFAULT STATE (leer – echte Daten kommen aus GitHub) ════════════════════════ */
+function defaultState() {
+  const months = {};
+  MONTHS.forEach(m => {
+    const days = [];
+    for (let t = 1; t <= m.tage; t++) {
+      days.push({ tag:t, typ:'frei', taetigkeit:'', land:'DE', frueh:'ohne', start:'', ende:'', pause:'', status:'geplant', spesenOverride:'' });
+    }
+    months[m.id] = {
+      days,
+      auslagen: [],
+      reiseplan: { hotels: [] },
+      abrechnung: {
+        uebertragIn: m.uebertragInDefault,   // null = automatisch vom Vormonat
+        vorschuss: m.vorschussDefault,
+        stundenAbrechnen: null,              // null = alle bestätigten
+        bruttoAuszahlung: 3000.00,
+        lst: 34.00,
+        notiz: ''
+      }
+    };
+  });
+  return { stundenlohn: STUNDENLOHN_DEFAULT, rates: JSON.parse(JSON.stringify(DEFAULT_RATES)), months, stamm: null };
+}
+
+/* ════════════════════════ STATE + GITHUB-SYNC ════════════════════════ */
+const DATA_OWNER = 'LarsimotoTMMAC';
+const DATA_REPO  = 'zeiterfassung-daten';
+const DATA_PATH  = 'state.json';
+const SYNC_KEY   = 'followred_sync_config_v1';
+const GH_API     = 'https://api.github.com';
+
+let syncCfg = null;
+try { syncCfg = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null'); } catch(e) {}
+
+let state = null;
+let fileSha = null;      // aktueller Git-Blob-SHA von state.json (nötig für Commits)
+let dirty = false;       // es gibt Änderungen, die noch nicht auf GitHub sind
+let pushTimer = null;
+let pushing = false;
+
+let curMonth = 'juni';
+let curSub = 'zeit';
+
+function setChip(mode, text) {
+  const chip = document.getElementById('syncChip');
+  if (!chip) return;
+  chip.className = 'sync-chip ' + mode;
+  document.getElementById('syncChipText').textContent = text;
+}
+function cacheLocal() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {} }
+
+function b64EncodeUtf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64DecodeUtf8(b64) {
+  const bin = atob(String(b64).replace(/\s/g, ''));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function ghUrl() { return GH_API + '/repos/' + syncCfg.owner + '/' + syncCfg.repo + '/contents/' + syncCfg.path; }
+function ghHeaders() {
+  return { 'Authorization': 'Bearer ' + syncCfg.token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+}
+
+function showLogin(err) {
+  document.getElementById('monthTabs').innerHTML = '';
+  document.getElementById('subTabs').innerHTML = '';
+  setChip('local', 'nicht verbunden');
+  document.getElementById('main').innerHTML = `
+    <div class="login-wrap">
+      <h2>🔐 Entsperren</h2>
+      <p>Alle Daten liegen in einem <b>privaten</b> GitHub-Repo. Zum Entsperren einmalig den Zugriffs-Token eingeben – er wird nur auf diesem Gerät gespeichert (Anleitung liegt im Daten-Repo).</p>
+      <label>GitHub-Token</label>
+      <input type="password" id="loginToken" placeholder="github_pat_…" autocomplete="off"
+             onkeydown="if(event.key==='Enter')doLogin()">
+      <div class="login-err" id="loginErr"></div>
+      <div style="margin-top:18px;"><button class="btn green" style="width:100%;padding:12px;" onclick="doLogin()">Entsperren &amp; Daten laden</button></div>
+    </div>`;
+  if (err) { const e = document.getElementById('loginErr'); e.style.display = 'block'; e.textContent = err; }
+}
+function doLogin() {
+  const t = document.getElementById('loginToken').value.trim();
+  if (!t) return;
+  syncCfg = { owner: DATA_OWNER, repo: DATA_REPO, path: DATA_PATH, token: t };
+  localStorage.setItem(SYNC_KEY, JSON.stringify(syncCfg));
+  loadRemote();
+}
+function logout() {
+  if (!confirm('Token von diesem Gerät entfernen? (Daten auf GitHub bleiben erhalten)')) return;
+  localStorage.removeItem(SYNC_KEY);
+  syncCfg = null;
+  showLogin();
+}
+
+function afterLoad() {
+  const st = getStamm();
+  const sub = document.getElementById('headerSub');
+  if (sub) sub.textContent = (st.name ? st.name + ' · ' : '') + 'Foodtruck Bosch ProTour · Stundenlohn ' + dec(state.stundenlohn) + ' €/Std · Sync via GitHub';
+  render();
+}
+
+async function loadRemote() {
+  setChip('pending', 'lädt…');
+  try {
+    const res = await fetch(ghUrl(), { headers: ghHeaders(), cache: 'no-store' });
+    if (res.status === 401 || res.status === 403) { showLogin('Token ungültig, abgelaufen oder ohne Zugriff auf das Daten-Repo.'); return; }
+    if (res.status === 404) { showLogin('state.json im Repo ' + syncCfg.owner + '/' + syncCfg.repo + ' nicht gefunden – Token-Berechtigung prüfen.'); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    fileSha = j.sha;
+    state = JSON.parse(b64DecodeUtf8(j.content));
+    if (!state.months) throw new Error('state.json hat unerwartetes Format');
+    cacheLocal();
+    dirty = false;
+    setChip('ok', 'synchron');
+    afterLoad();
+  } catch(e) {
+    // Offline o. Ä. → mit lokaler Kopie weiterarbeiten, falls vorhanden
+    let raw = null;
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch(_) {}
+    if (raw) {
+      try { state = JSON.parse(raw); } catch(_) { state = null; }
+    }
+    if (state) { setChip('error', 'offline – lokale Kopie'); afterLoad(); }
+    else showLogin('Keine Verbindung zu GitHub und keine lokale Kopie vorhanden (' + e.message + ').');
+  }
+}
+
+async function pushRemote() {
+  if (!state || !syncCfg) return;
+  if (pushing) { clearTimeout(pushTimer); pushTimer = setTimeout(pushRemote, 1500); return; }
+  pushing = true;
+  setChip('pending', 'speichert…');
+  try {
+    state._meta = Object.assign({}, state._meta, { updated: new Date().toISOString() });
+    const body = { message: 'Zeiterfassung: Stand ' + new Date().toLocaleString('de-DE'), content: b64EncodeUtf8(JSON.stringify(state, null, 2)) };
+    if (fileSha) body.sha = fileSha;
+    let res = await fetch(ghUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+    if (res.status === 409 || res.status === 422) {
+      // SHA veraltet (z. B. zwischenzeitlich von anderem Gerät gespeichert) → aktuellen SHA holen, einmal erneut
+      const cur = await fetch(ghUrl(), { headers: ghHeaders(), cache: 'no-store' });
+      if (cur.ok) {
+        body.sha = (await cur.json()).sha;
+        res = await fetch(ghUrl(), { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) });
+      }
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    fileSha = j.content.sha;
+    dirty = false;
+    setChip('ok', 'synchron');
+  } catch(e) {
+    setChip('error', 'NICHT gespeichert');
+  } finally {
+    pushing = false;
+  }
+}
+
+function save() {
+  if (!state) return;
+  cacheLocal();
+  dirty = true;
+  setChip('pending', 'speichert…');
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushRemote, 1500);
+}
+
+window.addEventListener('beforeunload', function(e) {
+  if (dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ════════════════════════ HELPER ════════════════════════ */
+function pMin(t) { // "HH:MM" -> Minuten, null bei leer/ungültig
+  if (!t) return null;
+  const m = String(t).trim().match(/^(\d{1,2})[:.](\d{2})$/);
+  if (!m) return null;
+  return parseInt(m[1],10)*60 + parseInt(m[2],10);
+}
+function fMin(min) { // Minuten -> "H:MM" / "HH:MM"
+  if (min == null) return '–';
+  min = ((min % 1440) + 1440) % 1440;
+  const h = Math.floor(min/60), mm = min%60;
+  return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+}
+function fDur(min) {
+  if (min == null) return '–';
+  const h = Math.floor(min/60), mm = min%60;
+  return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+}
+function eur(x) { return x.toLocaleString('de-DE',{minimumFractionDigits:2, maximumFractionDigits:2}) + ' €'; }
+function dec(x) { return x.toLocaleString('de-DE',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function monthMeta(id) { return MONTHS.find(m=>m.id===id); }
+function rateFor(code) { return state.rates.find(r=>r.code===code); }
+
+function dayCalc(day) {
+  // Rückgabe: { minNetto, dezStd, endeMitPause, spesen }
+  let minNetto = null, endeMitPause = null;
+  if (day.typ === 'offday') {
+    minNetto = 360;
+  } else if (day.typ === 'frei') {
+    minNetto = 0;
+  } else {
+    const s = pMin(day.start), e = pMin(day.ende);
+    if (s != null && e != null) {
+      let diff = e - s; if (diff <= 0) diff += 1440; // über Mitternacht
+      minNetto = diff;
+      const p = pMin(day.pause);
+      if (p != null && p > 0) endeMitPause = e + p;
+      else endeMitPause = e;
+    }
+  }
+  let spesen = 0;
+  if (day.typ !== 'frei') {
+    if (day.spesenOverride !== '' && day.spesenOverride != null && !isNaN(parseFloat(day.spesenOverride))) {
+      spesen = parseFloat(day.spesenOverride);
+    } else {
+      const r = rateFor(day.land);
+      if (r) spesen = (day.frueh === 'mit' && r.fruehAbzug) ? Math.round(r.rate*0.8*100)/100 : r.rate;
+    }
+  }
+  return { minNetto, dezStd: minNetto==null?null:minNetto/60, endeMitPause, spesen };
+}
+
+function monthSums(mid) {
+  const m = state.months[mid];
+  let minB=0, minG=0, spB=0, spG=0, tageB=0, tageG=0;
+  m.days.forEach(d => {
+    if (d.typ==='frei') return;
+    const c = dayCalc(d);
+    const mins = c.minNetto||0;
+    if (d.status==='bestaetigt') { minB+=mins; spB+=c.spesen; tageB++; }
+    else { minG+=mins; spG+=c.spesen; tageG++; }
+  });
+  const auslagen = m.auslagen.reduce((a,x)=>a+(parseFloat(x.betrag)||0),0);
+  return { minB, minG, spB, spG, tageB, tageG, auslagen };
+}
+
+function uebertragInEffective(mid) {
+  const m = state.months[mid];
+  if (m.abrechnung.uebertragIn != null) return m.abrechnung.uebertragIn;
+  // automatisch: Übertrag-out des Vormonats
+  const idx = MONTHS.findIndex(x=>x.id===mid);
+  if (idx <= 0) return 0;
+  return abrechnungCalc(MONTHS[idx-1].id).uebertragOut;
+}
+
+function abrechnungCalc(mid) {
+  const m = state.months[mid];
+  const a = m.abrechnung;
+  const sums = monthSums(mid);
+  const stdBest = sums.minB/60;
+  const stdAbr = (a.stundenAbrechnen != null && a.stundenAbrechnen !== '') ? parseFloat(a.stundenAbrechnen) : stdBest;
+  const brutto = Math.round(stdAbr * state.stundenlohn * 100)/100;
+  const uebIn = uebertragInEffective(mid);
+  const pool = Math.round((brutto + uebIn)*100)/100;
+  const auszBrutto = Math.min(parseFloat(a.bruttoAuszahlung)||0, pool);
+  const svAbz = SV.map(s=>({ ...s, betrag: Math.round(auszBrutto*s.satz*100)/100 }));
+  const lst = parseFloat(a.lst)||0;
+  const abzuege = svAbz.reduce((x,s)=>x+s.betrag, lst);
+  const netto = Math.round((auszBrutto - abzuege)*100)/100;
+  const vorschuss = parseFloat(a.vorschuss)||0;
+  const nettoNachV = Math.round((netto - vorschuss)*100)/100;
+  const auszahlung = Math.round((nettoNachV + sums.spB + sums.auslagen)*100)/100;
+  const uebertragOut = Math.round((pool - auszBrutto)*100)/100;
+  const restStd = Math.max(0, stdBest - stdAbr);
+  return { sums, stdBest, stdAbr, brutto, uebIn, pool, auszBrutto, svAbz, lst, abzuege, netto, vorschuss, nettoNachV, auszahlung, uebertragOut, restStd };
+}
+
+/* ════════════════════════ RENDER: NAV ════════════════════════ */
+const SUBS = [
+  { id:'zeit', label:'⏱ Zeiterfassung' },
+  { id:'reiseplan', label:'🗺 Reiseplan' },
+  { id:'auslagen', label:'🧾 Auslagen' },
+  { id:'abrechnung', label:'💶 Abrechnung' },
+  { id:'export', label:'⬇ Export' },
+  { id:'einstellungen', label:'⚙ Sätze' }
+];
+
+function renderNav() {
+  const mt = document.getElementById('monthTabs');
+  mt.innerHTML = MONTHS.map(m =>
+    `<button class="${curMonth===m.id?'active':''}" onclick="goMonth('${m.id}')">${m.name} ${m.year}</button>`).join('');
+  const st = document.getElementById('subTabs');
+  st.innerHTML = SUBS.map(s =>
+    `<button class="${curSub===s.id?'active':''}" onclick="goSub('${s.id}')">${s.label}</button>`).join('');
+}
+function goMonth(id){ curMonth=id; render(); }
+function goSub(id){ curSub=id; render(); }
+
+/* ════════════════════════ RENDER: ZEITERFASSUNG ════════════════════════ */
+function renderZeit() {
+  const meta = monthMeta(curMonth);
+  const m = state.months[curMonth];
+  const sums = monthSums(curMonth);
+  let rows = '';
+  m.days.forEach((d, i) => {
+    const c = dayCalc(d);
+    const date = new Date(meta.year, meta.num-1, d.tag);
+    const wd = date.getDay();
+    const we = (wd===0||wd===6);
+    const rowCls = d.typ==='offday' ? 'r-offday' : d.typ==='frei' ? 'r-frei' : '';
+    const statusCls = d.typ==='frei' ? '' : (d.status==='bestaetigt' ? 'r-bestaetigt' : 'r-geplant');
+    const timesOff = (d.typ==='offday' || d.typ==='frei');
+    rows += `<tr class="${rowCls} ${statusCls}">
+      <td><span class="wd">${WOCHENTAGE[wd]}</span><span class="dat ${we?'we':''}">${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.</span></td>
+      <td>
+        <select onchange="updDay(${i},'typ',this.value)">
+          <option value="einsatz" ${d.typ==='einsatz'?'selected':''}>Einsatz</option>
+          <option value="reise" ${d.typ==='reise'?'selected':''}>Reisetag</option>
+          <option value="offday" ${d.typ==='offday'?'selected':''}>Offday 6h</option>
+          <option value="frei" ${d.typ==='frei'?'selected':''}>Frei/Zuhause</option>
+        </select>
+      </td>
+      <td><input class="w-full" value="${esc(d.taetigkeit)}" onchange="updDay(${i},'taetigkeit',this.value)"></td>
+      <td>${timesOff?'–':`<input class="t" value="${esc(d.start)}" placeholder="07:00" onchange="updDay(${i},'start',this.value)">`}</td>
+      <td>${timesOff?'–':`<input class="t" value="${esc(d.ende)}" placeholder="17:00" onchange="updDay(${i},'ende',this.value)">`}</td>
+      <td>${timesOff?'–':`<input class="t" value="${esc(d.pause)}" placeholder="0:45" onchange="updDay(${i},'pause',this.value)">`}</td>
+      <td class="computed pausenende">${timesOff?'–':fMin(c.endeMitPause)}</td>
+      <td class="computed">${d.typ==='frei'?'–':fDur(c.minNetto)}</td>
+      <td>${d.typ==='frei'?'–':`<select onchange="updDay(${i},'land',this.value)">${state.rates.map(r=>`<option value="${r.code}" ${d.land===r.code?'selected':''}>${r.flag} ${r.code}</option>`).join('')}</select>`}</td>
+      <td>${d.typ==='frei'?'–':`<select onchange="updDay(${i},'frueh',this.value)"><option value="ohne" ${d.frueh==='ohne'?'selected':''}>ohne</option><option value="mit" ${d.frueh==='mit'?'selected':''}>mit</option></select>`}</td>
+      <td class="spesen-val">${d.typ==='frei'?'–':eur(c.spesen)}${d.spesenOverride!==''&&d.spesenOverride!=null?' *':''}</td>
+      <td>${d.typ==='frei'?'':`<select onchange="updDay(${i},'status',this.value)"><option value="geplant" ${d.status==='geplant'?'selected':''}>geplant</option><option value="bestaetigt" ${d.status==='bestaetigt'?'selected':''}>bestätigt ✓</option></select>`}</td>
+    </tr>`;
+  });
+
+  return `
+  <div class="kpi-row">
+    <div class="kpi green"><div class="v">${fDur(sums.minB)}</div><div class="l">Std. bestätigt (${sums.tageB} Tage)</div></div>
+    <div class="kpi gold"><div class="v">${fDur(sums.minG)}</div><div class="l">Std. geplant/offen (${sums.tageG} Tage)</div></div>
+    <div class="kpi green"><div class="v">${eur(sums.spB)}</div><div class="l">Spesen bestätigt</div></div>
+    <div class="kpi gold"><div class="v">${eur(sums.spG)}</div><div class="l">Spesen geplant/offen</div></div>
+    <div class="kpi"><div class="v">${eur(sums.auslagen)}</div><div class="l">Auslagen</div></div>
+  </div>
+  <div class="hint blue">
+    <b>Regeln:</b> Std. netto = Ende − Start (Pause wird NICHT abgezogen). Die Pause (Standard 0:45) wird auf die Ende-Zeit aufgeschlagen → Spalte „Ende mit Pause".
+    Offday/Pauschal-Reisetag = 6:00 h ohne Zeiten. Frühstück „mit" = −20 % Spesen (außer DE: kein Abzug). Spesen-Markierung „*" = manueller Override.
+    Tag auf <b>bestätigt ✓</b> setzen, sobald die Zeiten final sind – nur bestätigte Tage fließen in die Abrechnung.
+  </div>
+  <div class="toolbar">
+    <button class="btn small ghost" onclick="alleBestaetigen()">Alle Tage mit Zeiten bestätigen</button>
+    <span style="font-size:0.78rem;color:#888;">Spesen-Override: Doppelklick auf Spesen-Betrag</span>
+  </div>
+  <div class="table-scroll">
+  <table class="grid xwide">
+    <thead><tr>
+      <th style="width:74px">Datum</th><th style="width:110px">Typ</th><th>Tätigkeit / Route</th>
+      <th style="width:72px">Start</th><th style="width:72px">Ende</th><th style="width:72px">Pause</th>
+      <th style="width:80px">Ende m. P.</th><th style="width:70px">Std. netto</th>
+      <th style="width:92px">Land</th><th style="width:80px">Frühstück</th><th style="width:90px">Spesen</th><th style="width:110px">Status</th>
+    </tr></thead>
+    <tbody ondblclick="spesenOverridePrompt(event)">${rows}</tbody>
+    <tfoot><tr>
+      <td colspan="7">Gesamt (bestätigt + geplant)</td>
+      <td>${fDur(sums.minB+sums.minG)}</td>
+      <td colspan="2"></td>
+      <td>${eur(sums.spB+sums.spG)}</td><td></td>
+    </tr></tfoot>
+  </table>
+  </div>`;
+}
+
+function updDay(i, key, val) {
+  const d = state.months[curMonth].days[i];
+  d[key] = val;
+  if (key==='typ') {
+    if (val==='offday'||val==='frei') { d.start=''; d.ende=''; d.pause=''; }
+    else if (!d.pause) d.pause='0:45';
+  }
+  save(); render();
+}
+function alleBestaetigen() {
+  state.months[curMonth].days.forEach(d => {
+    if (d.typ==='frei') return;
+    const hasTimes = pMin(d.start)!=null && pMin(d.ende)!=null;
+    if (d.typ==='offday' || hasTimes) d.status='bestaetigt';
+  });
+  save(); render();
+}
+function spesenOverridePrompt(ev) {
+  const cell = ev.target.closest('td');
+  if (!cell || !cell.classList.contains('spesen-val')) return;
+  const tr = cell.closest('tr');
+  const idx = Array.from(tr.parentNode.children).indexOf(tr);
+  const d = state.months[curMonth].days[idx];
+  const cur = d.spesenOverride;
+  const val = prompt('Spesen-Override für diesen Tag (leer = automatisch):', cur==null?'':cur);
+  if (val === null) return;
+  d.spesenOverride = val.trim()==='' ? '' : val.replace(',','.');
+  save(); render();
+}
+
+/* ════════════════════════ RENDER: REISEPLAN ════════════════════════ */
+function renderReiseplan() {
+  const m = state.months[curMonth];
+  const hotels = m.reiseplan.hotels;
+  let cards = hotels.map((h,i) => `
+    <div class="hotel-edit">
+      <input value="${esc(h.nights)}" placeholder="Nächte" onchange="updHotel(${i},'nights',this.value)">
+      <input value="${esc(h.name)}" placeholder="Hotelname" onchange="updHotel(${i},'name',this.value)">
+      <input value="${esc(h.addr)}" placeholder="Adresse / Telefon" onchange="updHotel(${i},'addr',this.value)">
+      <input value="${esc(h.zimmer)}" placeholder="Zimmer" onchange="updHotel(${i},'zimmer',this.value)">
+      <select onchange="updHotel(${i},'frueh',this.value)">
+        <option value="mit" ${h.frueh==='mit'?'selected':''}>Frühstück ✓</option>
+        <option value="ohne" ${h.frueh==='ohne'?'selected':''}>ohne Frühst.</option>
+        <option value="offen" ${h.frueh==='offen'?'selected':''}>offen</option>
+      </select>
+      <select onchange="updHotel(${i},'status',this.value)">
+        <option value="gebucht" ${h.status==='gebucht'?'selected':''}>GEBUCHT ✓</option>
+        <option value="vorschlag" ${h.status==='vorschlag'?'selected':''}>Vorschlag</option>
+        <option value="offen" ${h.status==='offen'?'selected':''}>OFFEN</option>
+      </select>
+      <button class="btn small red" onclick="delHotel(${i})">✕</button>
+      <input style="grid-column:1/-1" value="${esc(h.hinweis)}" placeholder="Hinweis (Parkplatz, Check-in-Zeiten, …)" onchange="updHotel(${i},'hinweis',this.value)">
+    </div>`).join('');
+
+  return `
+  <div class="hint blue"><b>Reiseplan ${monthMeta(curMonth).name}:</b> Die Tagesroute pflegst du im Tab „Zeiterfassung" (Spalte Tätigkeit/Route).
+  Hier verwaltest du die <b>Hotels</b> – neue Buchungen einfach eintragen oder mir im Chat schicken. Der Export „Reiseplan HTML" kombiniert beides.</div>
+  <div class="panel">
+    <h3>🏨 Hotels ${monthMeta(curMonth).name} 2026</h3>
+    <div class="he-head"><span>Nächte</span><span>Hotel</span><span>Adresse</span><span>Zimmer</span><span>Frühstück</span><span>Status</span><span></span></div>
+    ${cards}
+    <button class="btn green" onclick="addHotel()">+ Hotel hinzufügen</button>
+  </div>`;
+}
+function updHotel(i,k,v){ state.months[curMonth].reiseplan.hotels[i][k]=v; save(); }
+function addHotel(){ state.months[curMonth].reiseplan.hotels.push({nights:'',name:'',addr:'',zimmer:'',frueh:'offen',status:'offen',hinweis:''}); save(); render(); }
+function delHotel(i){ if(confirm('Hotel-Eintrag löschen?')){ state.months[curMonth].reiseplan.hotels.splice(i,1); save(); render(); } }
+
+/* ════════════════════════ RENDER: AUSLAGEN ════════════════════════ */
+function renderAuslagen() {
+  const m = state.months[curMonth];
+  const meta = monthMeta(curMonth);
+  let rows = m.auslagen.map((a,i)=>`
+    <tr>
+      <td><input class="t" style="width:80px" value="${esc(a.datum)}" placeholder="TT.MM." onchange="updAusl(${i},'datum',this.value)"></td>
+      <td><input class="w-full" value="${esc(a.beschreibung)}" placeholder="Beschreibung" onchange="updAusl(${i},'beschreibung',this.value)"></td>
+      <td><input value="${esc(a.ort)}" placeholder="Ort" onchange="updAusl(${i},'ort',this.value)"></td>
+      <td><select onchange="updAusl(${i},'zahlung',this.value)">
+        <option value="Bar" ${a.zahlung==='Bar'?'selected':''}>Bar</option>
+        <option value="Karte" ${a.zahlung==='Karte'?'selected':''}>Karte</option>
+      </select></td>
+      <td><input class="num" value="${esc(a.betrag)}" placeholder="0,00" onchange="updAusl(${i},'betrag',this.value.replace(',','.'))"></td>
+      <td><button class="btn small red" onclick="delAusl(${i})">✕</button></td>
+    </tr>`).join('');
+  const sum = m.auslagen.reduce((x,a)=>x+(parseFloat(a.betrag)||0),0);
+  return `
+  <div class="hint blue">Auslagen (Waschstraße, Maut bar, Tickets, …) – werden netto erstattet. Belege aufbewahren!</div>
+  <div class="table-scroll">
+  <table class="grid">
+    <thead><tr><th>Datum</th><th>Beschreibung</th><th>Ort</th><th style="width:90px">Zahlung</th><th style="width:110px">Betrag (€)</th><th style="width:50px"></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="6" style="color:#999;font-style:italic;padding:14px;">Noch keine Auslagen für '+meta.name+' erfasst.</td></tr>'}</tbody>
+    <tfoot><tr><td colspan="4">Gesamt Auslagen</td><td>${eur(sum)}</td><td></td></tr></tfoot>
+  </table>
+  </div>
+  <div style="margin-top:12px;"><button class="btn green" onclick="addAusl()">+ Auslage hinzufügen</button></div>`;
+}
+function updAusl(i,k,v){ state.months[curMonth].auslagen[i][k]=v; save(); if(k==='betrag') render(); }
+function addAusl(){ state.months[curMonth].auslagen.push({datum:'',beschreibung:'',ort:'',zahlung:'Bar',betrag:''}); save(); render(); }
+function delAusl(i){ state.months[curMonth].auslagen.splice(i,1); save(); render(); }
+
+/* ════════════════════════ RENDER: ABRECHNUNG ════════════════════════ */
+function renderAbrechnung() {
+  const meta = monthMeta(curMonth);
+  const m = state.months[curMonth];
+  const a = m.abrechnung;
+  const c = abrechnungCalc(curMonth);
+  const idx = MONTHS.findIndex(x=>x.id===curMonth);
+  const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
+  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'September';
+  const autoUeb = a.uebertragIn == null;
+
+  return `
+  <div class="hint">${meta.id==='juni'
+    ? '<b>Übertrag aus Mai:</b> Restbrutto und Vorschuss sind aus der Mai-Abrechnung vorbefüllt (siehe Eingabefelder) – der Vorschuss wird in dieser Abrechnung abgezogen.'
+    : `<b>Übertrag aus ${prevName}:</b> wird automatisch aus der ${prevName}-Abrechnung übernommen (Feld leer lassen) oder manuell überschreiben.`}</div>
+
+  <div class="panel">
+    <h3>Eingaben – hier legst du fest</h3>
+    <table class="calc">
+      <tr><td>Bestätigte Stunden ${meta.name} (aus Zeiterfassung)</td><td>${dec(c.stdBest)} Std</td></tr>
+      <tr><td>Davon <b>abrechnen</b> (Dezimalstunden – leer = alle)
+        <br><span style="font-size:0.76rem;color:#888;">Hier legst du fest, wie viele Stunden in die ${meta.name}-Abrechnung fließen. Rest wandert als offene Stunden in den ${nextName}.</span></td>
+        <td><input class="num" value="${a.stundenAbrechnen==null?'':esc(a.stundenAbrechnen)}" placeholder="${dec(c.stdBest)}" onchange="updAbr('stundenAbrechnen',this.value)"></td></tr>
+      <tr><td>Brutto-Übertrag aus ${prevName} (€) ${autoUeb?'<span class="badge b-best">auto</span>':''}</td>
+        <td><input class="num" value="${a.uebertragIn==null?'':esc(a.uebertragIn)}" placeholder="${dec(c.uebIn)} (auto)" onchange="updAbr('uebertragIn',this.value)"></td></tr>
+      <tr><td>Brutto-<b>Auszahlung</b> diese Abrechnung (€)</td>
+        <td><input class="num" value="${esc(a.bruttoAuszahlung)}" onchange="updAbr('bruttoAuszahlung',this.value)"></td></tr>
+      <tr><td>Lohnsteuer StKl 3 (ca., €) <span style="font-size:0.76rem;color:#888;">– bei 3.000 € Brutto ≈ 34 €</span></td>
+        <td><input class="num" value="${esc(a.lst)}" onchange="updAbr('lst',this.value)"></td></tr>
+      <tr><td>Vorschuss-Abzug (€)</td>
+        <td><input class="num" value="${esc(a.vorschuss)}" onchange="updAbr('vorschuss',this.value)"></td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Brutto-Pool ${meta.name} 2026</h3>
+    <table class="calc">
+      <tr><td>Stundenlohn ${meta.name}: ${dec(c.stdAbr)} Std × ${dec(state.stundenlohn)} €</td><td>${eur(c.brutto)}</td></tr>
+      <tr class="gold"><td>+ Restbrutto-Übertrag ${prevName}</td><td>+ ${eur(c.uebIn)}</td></tr>
+      <tr class="sum"><td>= Brutto-Pool gesamt</td><td>${eur(c.pool)}</td></tr>
+      <tr class="red"><td>./. Ausgezahltes Brutto (diese Abrechnung)</td><td>− ${eur(c.auszBrutto)}</td></tr>
+      <tr class="gold"><td>= Restbrutto <b>Übertrag → ${nextName} 2026</b></td><td>${eur(c.uebertragOut)}</td></tr>
+      ${c.restStd>0?`<tr class="gold"><td>+ Nicht abgerechnete Stunden → ${nextName}</td><td>${dec(c.restStd)} Std</td></tr>`:''}
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Steuer / SV – auf ${eur(c.auszBrutto)} Brutto</h3>
+    <table class="calc">
+      <tr class="red"><td>Lohnsteuer (StKl 3, ca.)</td><td>− ${eur(c.lst)}</td></tr>
+      ${c.svAbz.map(s=>`<tr class="red"><td>${s.label}</td><td>− ${eur(s.betrag)}</td></tr>`).join('')}
+      <tr class="sum"><td>Gesamt Abzüge</td><td>− ${eur(c.abzuege)}</td></tr>
+      <tr class="green"><td><b>Netto-Verdienst</b></td><td>${eur(c.netto)}</td></tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h3>Auszahlung</h3>
+    <table class="calc">
+      <tr><td>Netto-Verdienst</td><td>${eur(c.netto)}</td></tr>
+      <tr class="red"><td>./. Vorschuss</td><td>− ${eur(c.vorschuss)}</td></tr>
+      <tr><td>= Netto nach Vorschuss</td><td>${eur(c.nettoNachV)}</td></tr>
+      <tr class="green"><td>+ Verpflegungsmehraufwand (Spesen, steuerfrei – nur bestätigte Tage)</td><td>+ ${eur(c.sums.spB)}</td></tr>
+      <tr class="green"><td>+ Auslagenersatz (netto)</td><td>+ ${eur(c.sums.auslagen)}</td></tr>
+      <tr class="total"><td>Auszahlungsbetrag gesamt</td><td>${eur(c.auszahlung)}</td></tr>
+    </table>
+  </div>
+  ${c.sums.tageG>0?`<div class="hint">⚠️ ${c.sums.tageG} Tag(e) stehen noch auf „geplant" – deren Stunden (${fDur(c.sums.minG)}) und Spesen (${eur(c.sums.spG)}) sind NICHT in dieser Abrechnung. Vor Monatsabschluss bestätigen!</div>`:''}`;
+}
+function updAbr(k,v){
+  const a = state.months[curMonth].abrechnung;
+  if (v==null || String(v).trim()==='') a[k] = (k==='uebertragIn'||k==='stundenAbrechnen') ? null : 0;
+  else a[k] = parseFloat(String(v).replace(',','.'));
+  save(); render();
+}
+
+/* ════════════════════════ RENDER: EXPORT ════════════════════════ */
+function renderExport() {
+  const meta = monthMeta(curMonth);
+  return `
+  <div class="hint green"><b>Export ${meta.name} 2026:</b> Erzeugt fertige HTML-Dokumente im Stil der Mai-Vorlagen (Arbeitsnachweis, Reiseplan, Gehaltsabrechnung) als Download.
+  Vorher alle Tage bestätigen und die Abrechnung prüfen.</div>
+  <div class="panel">
+    <h3>Dokumente erzeugen</h3>
+    <div class="toolbar">
+      <button class="btn" onclick="exportAZE('${curMonth}')">📄 Arbeitszeiterfassung_${meta.name}_2026.html</button>
+      <button class="btn" onclick="exportReiseplanDoc('${curMonth}')">🗺 Reiseplan_${meta.name}_2026.html</button>
+      <button class="btn gold" onclick="exportGehalt('${curMonth}')">💶 Gehaltszahlung_${meta.name}_2026.html</button>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Cloud-Sync &amp; Datensicherung</h3>
+    <div class="toolbar">
+      <button class="btn green" onclick="pushRemote()">☁ Jetzt auf GitHub speichern</button>
+      <button class="btn" onclick="reloadFromCloud()">⟳ Neu von GitHub laden</button>
+      <button class="btn ghost" onclick="exportJSON()">⬇ Backup (JSON) herunterladen</button>
+      <label class="btn ghost" style="cursor:pointer;">⬆ Backup einspielen<input type="file" accept=".json" style="display:none" onchange="importJSON(this)"></label>
+      <button class="btn red" onclick="logout()">🔒 Abmelden (Token entfernen)</button>
+    </div>
+    <p style="font-size:0.78rem;color:#888;margin-top:8px;">Jede Änderung wird automatisch als Commit ins private Daten-Repo gespeichert (Status-Punkt oben rechts).
+    Versionshistorie: GitHub → ${DATA_REPO} → state.json → History. Vor dem Schließen warten, bis der Punkt grün ist.</p>
+  </div>`;
+}
+
+function download(filename, content) {
+  const blob = new Blob([content], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function exportJSON() {
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Zeiterfassung_Sommer2026_Backup_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function importJSON(input) {
+  const f = input.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { state = JSON.parse(r.result); save(); render(); alert('Backup eingespielt.'); } catch(e){ alert('Ungültige Datei.'); } };
+  r.readAsText(f);
+}
+function reloadFromCloud() {
+  if (dirty && !confirm('Es gibt noch nicht gespeicherte Änderungen – wirklich den Stand von GitHub neu laden und lokale Änderungen verwerfen?')) return;
+  clearTimeout(pushTimer); dirty = false;
+  loadRemote();
+}
+
+/* ──────────── Export: Arbeitszeiterfassung ──────────── */
+const CSS_AZE = `* { box-sizing:border-box; margin:0; padding:0; } body { font-family:'Segoe UI',Arial,sans-serif; background:#f0f2f5; color:#222; padding:30px 20px; } .container { max-width:1100px; margin:0 auto; } header { background:#1a3a5c; color:#fff; padding:24px 30px; border-radius:10px 10px 0 0; } header h1 { font-size:1.5rem; font-weight:600; } header p { margin-top:4px; font-size:0.85rem; color:#a8c4e0; } .tabs { display:flex; background:#132d47; } .tab-btn { padding:12px 28px; border:none; background:transparent; color:#a8c4e0; font-size:0.88rem; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; } .tab-btn.active { color:#fff; border-bottom:3px solid #5ba3d9; background:rgba(255,255,255,0.08); } .tab-content { display:none; } .tab-content.active { display:block; } table { width:100%; border-collapse:collapse; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.08); } thead tr { background:#2c5f8a; color:#fff; text-align:left; } thead th { padding:13px 16px; font-size:0.82rem; font-weight:600; text-transform:uppercase; } tbody tr { border-bottom:1px solid #e8ecf0; } tbody td { padding:13px 16px; font-size:0.9rem; vertical-align:middle; } .wochentag { font-size:0.75rem; color:#888; display:block; margin-bottom:2px; } .datum-bold { font-weight:600; } .badge-land,.badge-frueh,.badge-offday { display:inline-block; padding:3px 9px; border-radius:12px; font-size:0.75rem; font-weight:600; } .badge-ja { background:#d4edda; color:#155724; } .badge-nein { background:#f8d7da; color:#721c24; } .badge-offday { background:#e8d5f5; color:#5a1a8a; } tr.row-offday td { background:#faf5ff; color:#5a1a8a; } .stunden { font-weight:600; color:#2c5f8a; } .spesen-betrag,.auslagen-betrag { font-weight:700; color:#1a3a5c; } tfoot tr { background:#1a3a5c; color:#fff; } tfoot td { padding:14px 16px; font-weight:700; font-size:0.9rem; } .hinweis { background:#fff; border-left:4px solid #2c5f8a; padding:14px 18px; font-size:0.78rem; color:#555; box-shadow:0 2px 10px rgba(0,0,0,0.06); border-radius:0 0 10px 10px; } .hinweis strong { color:#1a3a5c; } .hinweis ul { margin-top:6px; padding-left:18px; line-height:1.8; } .badge-pay { display:inline-block; padding:3px 9px; border-radius:12px; font-size:0.75rem; font-weight:600; } .badge-bar { background:#fff3cd; color:#856404; } .badge-karte { background:#dceeff; color:#1a5a99; } .lb-c { display:inline-block; padding:3px 9px; border-radius:12px; font-size:0.75rem; font-weight:600; background:#e8eef5; color:#1a3a5c; } @media print { body{background:#fff;padding:0;} .tabs{display:none;} .tab-content{display:block !important;} }`;
+
+function landBadge(code) {
+  const r = rateFor(code);
+  return `<span class="lb-c">${r?r.flag+' '+esc(r.label):esc(code)}</span>`;
+}
+
+function exportAZE(mid) {
+  const meta = monthMeta(mid);
+  const m = state.months[mid];
+  const sums = monthSums(mid);
+  let rows = '', laender = new Set();
+  m.days.forEach(d => {
+    if (d.typ==='frei') return;
+    const c = dayCalc(d);
+    const date = new Date(meta.year, meta.num-1, d.tag);
+    const wd = WOCHENTAGE[date.getDay()];
+    const off = d.typ==='offday';
+    const r = rateFor(d.land); if (r) laender.add(d.land);
+    const offenBadge = d.status!=='bestaetigt' ? ' <span class="badge-offday" style="background:#fff3cd;color:#856404;">OFFEN</span>' : '';
+    rows += `<tr${off?' class="row-offday"':''}>
+      <td><span class="wochentag">${wd}</span><span class="datum-bold">${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.${meta.year}</span></td>
+      <td>${esc(d.taetigkeit)}${off?' <span class="badge-offday">Pauschal 6 h</span>':''}${offenBadge}</td>
+      <td>${off?'–':esc(d.start)||'–'}</td><td>${off?'–':esc(d.ende)||'–'}</td>
+      <td style="color:${off?'#888':'#dc3545'};">${off?'–':esc(d.pause)||'–'}</td>
+      <td style="color:${off?'#888':'#a85400'};font-weight:600;">${off?'–':fMin(c.endeMitPause)}</td>
+      <td class="stunden"${off?' style="color:#5a1a8a;"':''}>${fDur(c.minNetto)}</td>
+      <td>${landBadge(d.land)}</td>
+      <td><span class="badge-frueh ${d.frueh==='mit'?'badge-ja':'badge-nein'}">${d.frueh==='mit'?'mit':'ohne'}</span></td>
+      <td class="spesen-betrag">${eur(c.spesen)}</td>
+    </tr>`;
+  });
+  let auslRows = m.auslagen.map(a=>`<tr>
+    <td><span class="datum-bold">${esc(a.datum)}${meta.year}</span></td>
+    <td>${esc(a.beschreibung)}</td><td>${esc(a.ort)}</td>
+    <td><span class="badge-pay ${a.zahlung==='Karte'?'badge-karte':'badge-bar'}">${esc(a.zahlung)}</span></td>
+    <td class="auslagen-betrag">${eur(parseFloat(a.betrag)||0)}</td></tr>`).join('');
+  const spesenLegende = Array.from(laender).map(code=>{
+    const r = rateFor(code);
+    return `<li><strong>${r.label}:</strong> ${eur(r.rate)}${r.fruehAbzug?` | mit Frühstück (−20 %): ${eur(Math.round(r.rate*0.8*100)/100)}`:' | Frühstück: kein Abzug'}</li>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arbeitszeiterfassung – ${meta.name} ${meta.year}</title><style>${CSS_AZE}</style></head><body><div class="container">
+<header><h1>Arbeitszeiterfassung &amp; Reisekostenübersicht</h1><p>Bosch ProTour Foodtruck | 01. ${meta.name} – ${meta.tage}. ${meta.name} ${meta.year} | ${esc(getStamm().name)}</p></header>
+<div class="tabs"><button class="tab-btn active" onclick="showTab('aze',this)">Arbeitszeiterfassung</button><button class="tab-btn" onclick="showTab('auslagen',this)">Auslagen</button></div>
+<div id="aze" class="tab-content active"><table><thead><tr><th>Datum</th><th>Tätigkeit / Route</th><th>Start</th><th>Ende</th><th style="color:#ffcccc;">Pause</th><th style="color:#ffd580;">Ende mit Pause</th><th>Std. netto</th><th>Land / Spesen</th><th>Frühstück</th><th>Spesen (€)</th></tr></thead>
+<tbody>${rows}</tbody>
+<tfoot><tr><td colspan="4">Gesamt (${sums.tageB+sums.tageG} Tage${sums.tageG>0?` | ${sums.tageG} noch offen`:' | alle bestätigt'})</td><td colspan="2"></td><td>${fDur(sums.minB+sums.minG)}</td><td colspan="2"></td><td>${eur(sums.spB+sums.spG)}</td></tr></tfoot></table>
+<div class="hinweis"><strong>Spesenberechnung (BMF-Pauschalsätze):</strong><ul>${spesenLegende}
+<li>Frühstücksabzug gemäß § 9 Abs. 4a EStG (20 % des jeweiligen Tagessatzes)</li>
+<li>Tagessatz richtet sich nach dem Land, in dem die Reise <strong>endet</strong> (Übernachtungsort / letzter Tätigkeitsort vor 24 Uhr)</li>
+<li>Offday-Pauschale (6 h) = pauschale Anwesenheitszeit, keine Start/Ende-Zeiten</li>
+<li>Pause (Standard 0:45) wird auf die Ende-Zeit aufgeschlagen („Ende mit Pause"), Std. netto = Ende − Start</li></ul></div></div>
+<div id="auslagen" class="tab-content"><table><thead><tr><th>Datum</th><th>Beschreibung</th><th>Ort</th><th>Zahlungsart</th><th>Betrag (€)</th></tr></thead>
+<tbody>${auslRows || '<tr><td colspan="5" style="color:#999;font-style:italic;">Keine Auslagen erfasst.</td></tr>'}</tbody>
+<tfoot><tr><td colspan="4">Gesamt Auslagen</td><td>${eur(sums.auslagen)}</td></tr></tfoot></table>
+<div class="hinweis"><strong>Hinweis Auslagen:</strong><ul><li>Belege bitte beifügen (Quittungen, Screenshots)</li><li>Barzahlungen ohne Beleg ggf. mit Eigenbeleg dokumentieren</li></ul></div></div>
+</div><script>function showTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active');btn.classList.add('active');}<\/script></body></html>`;
+  download(`Arbeitszeiterfassung_${meta.name}_${meta.year}.html`, html);
+}
+
+/* ──────────── Export: Reiseplan ──────────── */
+function exportReiseplanDoc(mid) {
+  const meta = monthMeta(mid);
+  const m = state.months[mid];
+  const typLabel = {einsatz:['EINSATZ','#27ae60','#eafaf1'], reise:['REISETAG','#2980b9','#eaf3fb'], offday:['OFFDAY','#f1c40f','#fdfde7'], frei:['FREI','#bdc3c7','#f8f8f8']};
+  let planRows = '';
+  m.days.forEach(d => {
+    const date = new Date(meta.year, meta.num-1, d.tag);
+    const [lbl,col,bg] = typLabel[d.typ]||typLabel.frei;
+    planRows += `<tr style="background:${bg};border-left:4px solid ${col};">
+      <td style="white-space:nowrap;"><b>${WD_KURZ[date.getDay()]} ${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.</b></td>
+      <td><span style="display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;color:${d.typ==='offday'?'#333':'#fff'};background:${col};">${lbl}</span></td>
+      <td>${esc(d.taetigkeit)}</td></tr>`;
+  });
+  let hotelCards = m.reiseplan.hotels.map(h => `
+    <div class="hotel-card"><div class="hotel-card-header"><span class="hotel-night-badge">${esc(h.nights)}</span><h3>${esc(h.name)}</h3></div>
+    <div class="hotel-card-body">
+      <span class="${h.status==='gebucht'?'breakfast-badge':'no-breakfast-badge'}">${h.status==='gebucht'?'✓ GEBUCHT':h.status==='vorschlag'?'VORSCHLAG':'OFFEN'}</span>
+      <span class="${h.frueh==='mit'?'breakfast-badge':'no-breakfast-badge'}">${h.frueh==='mit'?'Frühstück inkl.':h.frueh==='ohne'?'ohne Frühstück':'Frühstück offen'}</span>
+      ${h.addr?`<div class="hotel-addr">${esc(h.addr)}</div>`:''}
+      ${h.zimmer?`<div class="hotel-row"><span class="hotel-label">Zimmer</span><span class="hotel-value">${esc(h.zimmer)}</span></div>`:''}
+      ${h.hinweis?`<div class="hotel-dist-box">📍 ${esc(h.hinweis)}</div>`:''}
+    </div></div>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reiseplan ${meta.name} ${meta.year} – FOLLOWRED</title><style>
+* { box-sizing:border-box; margin:0; padding:0; } body { font-family:'Segoe UI',Arial,sans-serif; background:#f0f2f5; color:#222; font-size:14px; }
+header { background:linear-gradient(135deg,#c0392b,#8e1a11); color:#fff; padding:22px 32px; display:flex; align-items:center; justify-content:space-between; }
+header h1 { font-size:22px; font-weight:700; letter-spacing:1px; } header p { font-size:13px; opacity:0.85; margin-top:4px; } .logo { font-size:28px; font-weight:900; letter-spacing:2px; }
+.container { max-width:1200px; margin:0 auto; padding:24px 20px; }
+.section-title { font-size:18px; font-weight:700; color:#2c3e50; margin:26px 0 16px; display:flex; align-items:center; gap:10px; }
+.section-title::after { content:''; flex:1; height:2px; background:linear-gradient(to right,#c0392b,transparent); }
+.plan-table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); }
+.plan-table th { background:#2c3e50; color:#fff; padding:12px 14px; text-align:left; font-size:12px; text-transform:uppercase; }
+.plan-table td { padding:10px 14px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+.hotels-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:18px; }
+.hotel-card { background:#fff; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,0.08); overflow:hidden; }
+.hotel-card-header { background:linear-gradient(135deg,#2c3e50,#34495e); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:12px; }
+.hotel-night-badge { background:#c0392b; color:#fff; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:700; white-space:nowrap; }
+.hotel-card-header h3 { font-size:14px; font-weight:700; } .hotel-card-body { padding:16px 18px; }
+.hotel-row { display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px; } .hotel-label { color:#888; } .hotel-value { font-weight:600; }
+.hotel-addr { background:#f8f8f8; border-radius:6px; padding:8px 12px; font-size:12px; color:#555; margin-bottom:10px; }
+.hotel-dist-box { background:#eaf3fb; border-radius:6px; padding:8px 12px; font-size:12px; margin-top:10px; border-left:3px solid #2980b9; }
+.breakfast-badge { display:inline-block; background:#d5f5e3; color:#1a7a40; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600; margin:0 4px 8px 0; }
+.no-breakfast-badge { display:inline-block; background:#f4f4f4; color:#888; border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600; margin:0 4px 8px 0; }
+@media print { body{background:#fff;} }
+</style></head><body>
+<header><div><h1>Reiseplan ${meta.name} ${meta.year}${getStamm().name?' — '+esc(getStamm().name.split(' ')[0]):''}</h1><p>Bosch ProTour Foodtruck · Stand ${new Date().toLocaleDateString('de-DE')}</p></div><div class="logo">FOLLOWRED</div></header>
+<div class="container">
+<div class="section-title">🗓 Tagesplan</div>
+<table class="plan-table"><thead><tr><th style="width:90px">Tag</th><th style="width:110px">Typ</th><th>Route / Einsatz</th></tr></thead><tbody>${planRows}</tbody></table>
+<div class="section-title">🏨 Hotels</div>
+<div class="hotels-grid">${hotelCards}</div>
+</div></body></html>`;
+  download(`Reiseplan_${meta.name}_${meta.year}.html`, html);
+}
+
+/* ──────────── Export: Gehaltszahlung ──────────── */
+function exportGehalt(mid) {
+  const STAMM = getStamm();
+  const meta = monthMeta(mid);
+  const m = state.months[mid];
+  const c = abrechnungCalc(mid);
+  const idx = MONTHS.findIndex(x=>x.id===mid);
+  const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
+  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'September';
+
+  let stdRows = '';
+  m.days.forEach(d => {
+    if (d.typ==='frei') return;
+    const cd = dayCalc(d);
+    const date = new Date(meta.year, meta.num-1, d.tag);
+    const off = d.typ==='offday';
+    const dezBetrag = (cd.dezStd||0)*state.stundenlohn;
+    stdRows += `<tr${off?' class="row-offday"':''}>
+      <td><strong>${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.</strong> <span style="font-size:0.74rem;color:#888;">${WD_KURZ[date.getDay()]}</span></td>
+      <td>${esc(d.taetigkeit)}${off?' <span class="badge b-offday">Pauschal 6 h</span>':''}${d.frueh==='mit'?' <span class="badge-frueh-ja">Frühstück</span>':''}${d.status!=='bestaetigt'?' <span class="badge b-offen">OFFEN</span>':''}</td>
+      <td class="tc">${off?'–':esc(d.start)||'–'}</td><td class="tc">${off?'–':esc(d.ende)||'–'}</td>
+      <td class="tc std-pause">${off?'–':esc(d.pause)||'–'}</td>
+      <td class="tc" style="color:#856404;font-weight:600;">${off?'–':fMin(cd.endeMitPause)}</td>
+      <td class="tc std-net"${off?' style="color:#5a1a8a;"':''}>${fDur(cd.minNetto)}</td>
+      <td class="tc">${landBadge(d.land)}</td>
+      <td class="tr">${cd.dezStd==null?'–':dec(cd.dezStd)}</td>
+      <td class="tr fw7">${dec(dezBetrag)}</td>
+      <td class="tr" style="color:#155724;font-weight:600;">${dec(cd.spesen)}</td>
+    </tr>`;
+  });
+  let auslRows = m.auslagen.map(a=>`<tr><td><strong>${esc(a.datum)}${meta.year}</strong></td><td>${esc(a.beschreibung)}</td><td>${esc(a.ort)}</td>
+    <td class="tc"><span class="badge" style="background:#fff3cd;color:#856404;">${esc(a.zahlung)}</span></td><td class="tr fw7">${dec(parseFloat(a.betrag)||0)}</td></tr>`).join('');
+
+  const CSS_G = `* { box-sizing:border-box; margin:0; padding:0; } body { font-family:'Segoe UI',Arial,sans-serif; background:#f0f2f5; color:#222; padding:30px 20px; } .container { max-width:1160px; margin:0 auto; } header { background:#1a3a5c; color:#fff; padding:24px 30px; border-radius:10px 10px 0 0; display:flex; justify-content:space-between; align-items:flex-start; } header h1 { font-size:1.4rem; font-weight:600; } header p { margin-top:4px; font-size:0.85rem; color:#a8c4e0; } .header-right { text-align:right; font-size:0.8rem; color:#a8c4e0; line-height:1.7; } .tabs { display:flex; background:#132d47; } .tab-btn { padding:12px 24px; border:none; background:transparent; color:#a8c4e0; font-size:0.88rem; font-weight:600; cursor:pointer; border-bottom:3px solid transparent; } .tab-btn.active { color:#fff; border-bottom:3px solid #5ba3d9; background:rgba(255,255,255,0.08); } .tab-content { display:none; } .tab-content.active { display:block; } .content-area { background:#fff; box-shadow:0 2px 10px rgba(0,0,0,0.08); } .stammdaten { display:grid; grid-template-columns:1fr 1fr; border-bottom:2px solid #e0e6ee; } .stammdaten-left { padding:20px 24px; border-right:1px solid #e0e6ee; } .stammdaten-right { padding:20px 24px; } .mname { font-size:1.1rem; font-weight:700; color:#1a3a5c; margin-bottom:3px; } .madr { font-size:0.85rem; color:#555; line-height:1.5; margin-bottom:12px; } .sgrid { display:grid; grid-template-columns:1fr 1fr; gap:6px 20px; } .slabel { font-size:0.7rem; color:#888; text-transform:uppercase; display:block; } .svalue { font-size:0.85rem; font-weight:600; color:#1a3a5c; } .period-box { background:#f5f8fc; border:1px solid #d0dce8; border-radius:6px; padding:14px 18px; margin-bottom:14px; } .period-label { font-size:0.7rem; color:#888; text-transform:uppercase; } .period-value { font-size:1.15rem; font-weight:700; color:#1a3a5c; } .bank-box { background:#f5f8fc; border:1px solid #d0dce8; border-radius:6px; padding:10px 14px; } .bank-label { font-size:0.7rem; color:#888; text-transform:uppercase; } .bank-value { font-size:0.82rem; font-weight:600; color:#1a3a5c; } .sec-header { background:#2c5f8a; color:#fff; padding:8px 16px; font-size:0.78rem; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; } table { width:100%; border-collapse:collapse; } thead tr { background:#eaf1f8; color:#2c5f8a; text-align:left; } thead th { padding:9px 14px; font-size:0.75rem; font-weight:700; text-transform:uppercase; border-bottom:1px solid #c8d8e8; } tbody tr { border-bottom:1px solid #e8ecf0; } tbody td { padding:10px 14px; font-size:0.87rem; vertical-align:middle; } .tr { text-align:right; } .tc { text-align:center; } .fw7 { font-weight:700; } .c-blue { color:#1a3a5c; } .c-green { color:#155724; } .c-red { color:#7a0000; } .c-gold { color:#856404; } .row-sum td { background:#eaf1f8; font-weight:700; color:#1a3a5c; border-top:2px solid #2c5f8a; padding:11px 14px; } .row-sum-green td { background:#d4edda; font-weight:700; color:#155724; border-top:2px solid #28a745; padding:11px 14px; } .row-sum-total td { background:#1a3a5c; color:#fff; font-weight:700; font-size:0.95rem; padding:13px 14px; } tr.row-offday td { background:#f3e8ff; color:#5a1a8a; } tr.row-abzug td { background:#fff5f5; } tr.row-netto-add td { background:#f0fff4; } tr.row-uebertrag td { background:#fff8e8; } tr.row-vorschuss td { background:#fff0f5; } tr.row-pool td { background:#f0f8ff; } .badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:600; } .b-offen { background:#fff3cd; color:#856404; } .b-steuerfrei { background:#d4edda; color:#155724; } .b-netto { background:#cfe2ff; color:#084298; } .b-offday { background:#e8d5f5; color:#5a1a8a; } .b-uebertrag { background:#fff3cd; color:#856404; } .b-vorschuss { background:#ffdde8; color:#8b0030; } .lb-c { display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:600; background:#e8eef5; color:#1a3a5c; } .badge-frueh-ja { background:#d4edda; color:#155724; display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:600; } .hinweis { background:#fff; border-left:4px solid #2c5f8a; padding:14px 18px; font-size:0.78rem; color:#555; box-shadow:0 2px 10px rgba(0,0,0,0.06); border-radius:0 0 10px 10px; } .hinweis strong { color:#1a3a5c; } .hinweis ul { margin-top:6px; padding-left:18px; line-height:1.9; } .std-net { font-weight:700; color:#2c5f8a; } .std-pause { color:#dc3545; font-size:0.82rem; font-weight:600; } tfoot tr { background:#1a3a5c; color:#fff; } tfoot td { padding:13px 14px; font-weight:700; font-size:0.88rem; } @media print { body{background:#fff;padding:0;} .tabs{display:none;} .tab-content{display:block !important;} }`;
+
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gehaltsabrechnung – ${STAMM.name} – ${meta.name} ${meta.year}</title><style>${CSS_G}</style></head><body><div class="container">
+<header><div><h1>Gehaltsabrechnung – ${meta.name} ${meta.year}</h1><p>Abrechnung Brutto/Netto-Bezüge &amp; Reisekostenerstattung | ${STAMM.name}</p></div>
+<div class="header-right"><div>Personal-Nr. <strong style="color:#fff;">${STAMM.pnr}</strong></div><div>A4A/A5 &nbsp;|&nbsp; 132137/914/${STAMM.pnr}</div><div>Abrechnungsdatum: ${meta.tage}.${String(meta.num).padStart(2,'0')}.${meta.year}</div></div></header>
+<div class="tabs"><button class="tab-btn active" onclick="showTab('abrechnung',this)">Gehaltsabrechnung</button><button class="tab-btn" onclick="showTab('stunden',this)">Stundennachweis</button><button class="tab-btn" onclick="showTab('auslagen',this)">Auslagen</button></div>
+<div id="abrechnung" class="tab-content active"><div class="content-area">
+<div class="stammdaten"><div class="stammdaten-left"><div class="mname">${STAMM.name}</div><div class="madr">${STAMM.adresse}</div>
+<div class="sgrid"><div><span class="slabel">Personal-Nr.</span><span class="svalue">${STAMM.pnr}</span></div><div><span class="slabel">Geburtsdatum</span><span class="svalue">${STAMM.geb}</span></div>
+<div><span class="slabel">Steuerklasse</span><span class="svalue">${STAMM.stkl}</span></div><div><span class="slabel">Eintritt</span><span class="svalue">${STAMM.eintritt}</span></div>
+<div><span class="slabel">Steuer-ID</span><span class="svalue">${STAMM.steuerId}</span></div><div><span class="slabel">SV-Nummer</span><span class="svalue">${STAMM.svNr}</span></div>
+<div style="grid-column:span 2"><span class="slabel">Krankenkasse</span><span class="svalue">${STAMM.kk}</span></div></div></div>
+<div class="stammdaten-right"><div class="period-box"><div class="period-label">Abrechnungszeitraum</div><div class="period-value">${meta.name} ${meta.year}</div></div>
+<div class="bank-box"><div class="bank-label">Bankverbindung</div><div class="bank-value">${STAMM.bank}</div><div class="bank-value" style="font-family:monospace;letter-spacing:0.5px;">${STAMM.iban}</div></div></div></div>
+<div class="sec-header">Brutto-Bezüge ${meta.name} ${meta.year}</div>
+<table><thead><tr><th style="width:80px">Lohnart</th><th>Bezeichnung</th><th class="tc" style="width:80px">Einheit</th><th class="tr" style="width:110px">Menge</th><th class="tr" style="width:110px">Faktor (€)</th><th class="tr" style="width:130px">Betrag (€)</th></tr></thead>
+<tbody><tr><td>011</td><td>Stundenlohn ${meta.name} ${meta.year} <span style="font-size:0.75rem;color:#888;">(${c.sums.tageB} Tage bestätigt${c.restStd>0?`, ${dec(c.restStd)} Std zurückgestellt → ${nextName}`:''})</span></td>
+<td class="tc">Std</td><td class="tr">${dec(c.stdAbr)}</td><td class="tr">${dec(state.stundenlohn)}</td><td class="tr fw7 c-blue">${dec(c.brutto)}</td></tr></tbody>
+<tr class="row-sum"><td colspan="5">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr" style="font-size:1rem;">${eur(c.brutto)}</td></tr></table>
+<div class="sec-header">Brutto-Pool – ${meta.name} ${meta.year} inkl. Vormonat-Übertrag</div>
+<table><thead><tr><th>Position</th><th class="tr">Betrag (€)</th><th>Erläuterung</th></tr></thead><tbody>
+<tr class="row-pool"><td class="fw7">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr fw7 c-blue">${eur(c.brutto)}</td><td>${dec(c.stdAbr)} Std × ${dec(state.stundenlohn)} €/Std</td></tr>
+<tr class="row-uebertrag"><td class="fw7">+ Restbrutto Übertrag ${prevName} ${meta.year} <span class="badge b-uebertrag">Vormonat</span></td><td class="tr fw7 c-gold">+ ${eur(c.uebIn)}</td><td>Übertrag laut ${prevName}-Abrechnung</td></tr>
+<tr class="row-sum"><td class="fw7">= Brutto-Pool gesamt</td><td class="tr fw7 c-blue">${eur(c.pool)}</td><td style="font-weight:400;">Verfügbares Brutto inkl. Vormonat</td></tr>
+<tr class="row-abzug"><td class="fw7">./. Ausgezahltes Brutto (diese Abrechnung)</td><td class="tr fw7 c-red">− ${eur(c.auszBrutto)}</td><td>Anteilige Auszahlung auf Anforderung</td></tr>
+<tr class="row-uebertrag"><td class="fw7">= Restbrutto <span class="badge b-uebertrag">Übertrag → ${nextName} ${meta.year}</span></td><td class="tr fw7 c-gold">${eur(c.uebertragOut)}</td><td>Wird in ${nextName} ${meta.year} abgerechnet</td></tr></tbody></table>
+<div class="sec-header">Steuer / Sozialversicherung – auf ${eur(c.auszBrutto)} Brutto</div>
+<table><thead><tr><th style="width:60px">Stkl.</th><th>Bezeichnung</th><th class="tr" style="width:120px">Basis (€)</th><th class="tr" style="width:80px">Satz</th><th class="tr" style="width:130px">Abzug (€)</th></tr></thead><tbody>
+<tr class="row-abzug"><td>${STAMM.stkl}</td><td>Lohnsteuer <span style="font-size:0.75rem;color:#888;">(ca., gem. StKl ${STAMM.stkl}, PAP 2026)</span></td><td class="tr">${dec(c.auszBrutto)}</td><td class="tr">–</td><td class="tr fw7 c-red">− ${dec(c.lst)}</td></tr>
+${c.svAbz.map(s=>`<tr class="row-abzug"><td></td><td>${s.label}</td><td class="tr">${dec(c.auszBrutto)}</td><td class="tr">${(s.satz*100).toLocaleString('de-DE',{minimumFractionDigits:2})} %</td><td class="tr fw7 c-red">− ${dec(s.betrag)}</td></tr>`).join('')}
+</tbody><tr class="row-sum"><td colspan="4">Gesamt Abzüge Steuer / SV</td><td class="tr">− ${eur(c.abzuege)}</td></tr>
+<tr class="row-sum-green"><td colspan="4">Netto-Verdienst (von ${eur(c.auszBrutto)} Brutto)</td><td class="tr">${eur(c.netto)}</td></tr></table>
+<div class="sec-header">Netto-Bezüge / Steuerfreie Erstattungen</div>
+<table><thead><tr><th style="width:80px">Nr.</th><th>Bezeichnung</th><th></th><th class="tr" style="width:160px">Betrag (€)</th></tr></thead><tbody>
+<tr class="row-netto-add"><td>9979</td><td>Verpflegungsmehraufwand (Spesen) ${meta.name} ${meta.year}</td><td><span class="badge b-steuerfrei">steuerfrei § 9 Abs. 4a EStG</span></td><td class="tr fw7 c-green">+ ${dec(c.sums.spB)}</td></tr>
+<tr class="row-netto-add"><td>9970</td><td>Auslagenersatz ${meta.name} ${meta.year}</td><td><span class="badge b-netto">netto</span></td><td class="tr fw7 c-green">+ ${dec(c.sums.auslagen)}</td></tr></tbody>
+<tr class="row-sum-green"><td colspan="3">Gesamt Netto-Erstattungen</td><td class="tr">+ ${eur(c.sums.spB + c.sums.auslagen)}</td></tr></table>
+<div class="sec-header">Auszahlungsbetrag</div>
+<table><tbody>
+<tr class="row-netto-add"><td class="fw7" style="padding:10px 14px;">Netto-Verdienst</td><td class="tr fw7" style="padding:10px 14px;width:200px;">${eur(c.netto)}</td></tr>
+${c.vorschuss>0?`<tr class="row-vorschuss"><td style="padding:10px 14px;">./. Vorschuss <span class="badge b-vorschuss">Vorschuss</span></td><td class="tr fw7 c-red" style="padding:10px 14px;">− ${eur(c.vorschuss)}</td></tr>
+<tr class="row-netto-add"><td style="padding:10px 14px;color:#555;">= Netto nach Vorschussabzug</td><td class="tr fw7 c-blue" style="padding:10px 14px;">${eur(c.nettoNachV)}</td></tr>`:''}
+<tr class="row-netto-add"><td style="padding:10px 14px;">+ Verpflegungsmehraufwand (netto, steuerfrei)</td><td class="tr fw7 c-green" style="padding:10px 14px;">+ ${eur(c.sums.spB)}</td></tr>
+<tr class="row-netto-add"><td style="padding:10px 14px;">+ Auslagenersatz (netto)</td><td class="tr fw7 c-green" style="padding:10px 14px;">+ ${eur(c.sums.auslagen)}</td></tr></tbody>
+<tr class="row-sum-total"><td style="font-size:1.1rem;">Auszahlungsbetrag gesamt</td><td class="tr" style="font-size:1.2rem;width:200px;">${eur(c.auszahlung)}</td></tr></table>
+<div class="sec-header">Restbrutto-Übertrag</div>
+<table><tbody><tr class="row-uebertrag"><td style="padding:10px 14px;" class="fw7">Restbrutto Übertrag → ${nextName} ${meta.year} <span style="font-size:0.8rem;font-weight:400;">(${dec(c.pool)} − ${dec(c.auszBrutto)} €)</span></td>
+<td class="tr fw7 c-gold" style="padding:10px 14px;width:200px;">${eur(c.uebertragOut)}</td></tr>
+${c.restStd>0?`<tr class="row-uebertrag"><td style="padding:10px 14px;" class="fw7">Nicht abgerechnete Stunden → ${nextName} ${meta.year}</td><td class="tr fw7 c-gold" style="padding:10px 14px;">${dec(c.restStd)} Std</td></tr>`:''}
+</tbody></table>
+</div>
+<div class="hinweis"><strong>Berechnungsgrundlagen ${meta.name} ${meta.year}:</strong><ul>
+<li><strong>Stunden:</strong> ${dec(c.stdBest)} Std bestätigt | davon abgerechnet: ${dec(c.stdAbr)} Std × ${dec(state.stundenlohn)} € = ${eur(c.brutto)} Brutto</li>
+<li><strong>Vormonat-Übertrag:</strong> ${prevName}-Restbrutto ${eur(c.uebIn)} | Brutto-Pool ${meta.name}: ${eur(c.pool)}</li>
+<li><strong>Auszahlung:</strong> ${eur(c.auszBrutto)} Brutto ausgezahlt | Restbrutto ${eur(c.uebertragOut)} → Übertrag ${nextName} ${meta.year}</li>
+${c.vorschuss>0?`<li><strong>Vorschuss:</strong> ${eur(c.vorschuss)} – wird vom Netto-Verdienst abgezogen</li>`:''}
+<li><strong>KV 2026:</strong> 17,58 % Gesamtsatz, AN-Anteil 8,79 % | <strong>RV:</strong> AN 9,30 % | <strong>AV:</strong> AN 1,30 % | <strong>PV kinderlos:</strong> AN 2,40 %</li>
+<li><strong>Spesen:</strong> ${eur(c.sums.spB)} steuerfrei § 9 Abs. 4a EStG | <strong>Auslagen:</strong> ${eur(c.sums.auslagen)} netto</li></ul></div></div>
+<div id="stunden" class="tab-content"><table><thead><tr><th>Datum</th><th>Tätigkeit / Route</th><th class="tc">Start</th><th class="tc">Ende</th><th class="tc">Pause</th><th class="tc" style="color:#ffd580;">Ende m. P.</th><th class="tc">Std. netto</th><th class="tc">Land</th><th class="tr">Dez. Std</th><th class="tr">Betrag (€)</th><th class="tr" style="color:#b8e0b8;">Spesen (€)</th></tr></thead>
+<tbody>${stdRows}</tbody>
+<tfoot><tr><td colspan="6">Gesamt (${c.sums.tageB+c.sums.tageG} Tage)</td><td class="tc">${fDur(c.sums.minB+c.sums.minG)}</td><td></td><td class="tr">${dec((c.sums.minB+c.sums.minG)/60)}</td><td class="tr">${eur((c.sums.minB+c.sums.minG)/60*state.stundenlohn)}</td><td class="tr">${eur(c.sums.spB+c.sums.spG)}</td></tr></tfoot></table>
+<div class="hinweis"><strong>Pausenregelung &amp; Hinweise:</strong><ul>
+<li>Reise-/Einsatztage mit Zeiten: Pause (Standard 0:45) wird auf Ende-Zeit aufgeschlagen | Dezimal: 0:15 = 0,25 | 0:30 = 0,50 | 0:45 = 0,75</li>
+<li>Offday- und Pauschal-Reisetage: 6 h pauschal, keine Start/Ende-Zeiten</li>
+<li>Frühstück „mit" = −20 % vom Spesensatz (§ 9 Abs. 4a EStG), Deutschland: kein Abzug</li></ul></div></div>
+<div id="auslagen" class="tab-content"><table><thead><tr><th>Datum</th><th>Beschreibung</th><th>Ort</th><th class="tc">Zahlungsart</th><th class="tr">Betrag (€)</th></tr></thead>
+<tbody>${auslRows || '<tr><td colspan="5" style="color:#999;font-style:italic;">Keine Auslagen erfasst.</td></tr>'}</tbody>
+<tfoot><tr><td colspan="4">Gesamt Auslagen (netto)</td><td class="tr">${eur(c.sums.auslagen)}</td></tr></tfoot></table>
+<div class="hinweis"><strong>Hinweis Auslagen:</strong><ul><li>Alle Positionen werden als steuerfreier Auslagenersatz netto ausgezahlt</li><li>Barzahlungen: ggf. Eigenbeleg erstellen</li></ul></div></div>
+</div><script>function showTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active');btn.classList.add('active');}<\/script></body></html>`;
+  download(`Gehaltszahlung_${meta.name}_${meta.year}.html`, html);
+}
+
+/* ════════════════════════ RENDER: EINSTELLUNGEN ════════════════════════ */
+function renderEinstellungen() {
+  let rows = state.rates.map((r,i)=>`
+    <tr>
+      <td>${r.flag} <b>${r.code}</b></td>
+      <td><input class="w-full" value="${esc(r.label)}" onchange="updRate(${i},'label',this.value)"></td>
+      <td><input class="num" value="${esc(r.rate)}" onchange="updRate(${i},'rate',this.value.replace(',','.'))"></td>
+      <td>${r.fruehAbzug?eur(Math.round(r.rate*0.8*100)/100):'kein Abzug'}</td>
+      <td><select onchange="updRate(${i},'fruehAbzug',this.value==='1')">
+        <option value="1" ${r.fruehAbzug?'selected':''}>−20 % bei „mit"</option>
+        <option value="0" ${!r.fruehAbzug?'selected':''}>kein Abzug</option></select></td>
+    </tr>`).join('');
+  return `
+  <div class="hint"><b>Spesensätze (BMF-Auslandstagegelder, Volltag):</b> Vorbefüllt mit den gängigen Sätzen – bitte gegen die aktuelle BMF-Tabelle 2026 prüfen und bei Bedarf anpassen. Änderungen wirken sofort auf alle Monate.</div>
+  <div class="panel">
+    <h3>Stundenlohn</h3>
+    <input class="num" value="${esc(state.stundenlohn)}" onchange="state.stundenlohn=parseFloat(this.value.replace(',','.'))||20; save(); render();"> €/Std
+  </div>
+  <div class="panel">
+    <h3>Spesensätze</h3>
+    <div class="table-scroll">
+    <table class="grid"><thead><tr><th style="width:80px">Land</th><th>Bezeichnung</th><th style="width:110px">Satz Volltag (€)</th><th style="width:120px">mit Frühstück</th><th style="width:150px">Frühstücksregel</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    </div>
+  </div>`;
+}
+function updRate(i,k,v){
+  if (k==='rate') state.rates[i][k]=parseFloat(v)||0;
+  else state.rates[i][k]=v;
+  save(); render();
+}
+
+/* ════════════════════════ MAIN RENDER ════════════════════════ */
+function render() {
+  if (!state) return;
+  renderNav();
+  const main = document.getElementById('main');
+  switch(curSub) {
+    case 'zeit': main.innerHTML = renderZeit(); break;
+    case 'reiseplan': main.innerHTML = renderReiseplan(); break;
+    case 'auslagen': main.innerHTML = renderAuslagen(); break;
+    case 'abrechnung': main.innerHTML = renderAbrechnung(); break;
+    case 'export': main.innerHTML = renderExport(); break;
+    case 'einstellungen': main.innerHTML = renderEinstellungen(); break;
+  }
+}
+
+/* ════════════════════════ START ════════════════════════ */
+if (syncCfg && syncCfg.token) loadRemote();
+else showLogin();
+</script>
+</body>
+</html>
