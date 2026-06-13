@@ -249,6 +249,7 @@ function defaultState() {
     months[m.id] = {
       days,
       auslagen: [],
+      lenkzeiten: [],
       reiseplan: { hotels: [] },
       abrechnung: {
         uebertragIn: m.uebertragInDefault,   // null = automatisch vom Vormonat
@@ -338,7 +339,17 @@ function logout() {
   showLogin();
 }
 
+function migrateLz() {
+  if (!state || !state.months) return;
+  MONTHS.forEach(mo => {
+    if (state.months[mo.id] && !Array.isArray(state.months[mo.id].lenkzeiten)) {
+      state.months[mo.id].lenkzeiten = [];
+    }
+  });
+}
+
 function afterLoad() {
+  migrateLz();
   const st = getStamm();
   const sub = document.getElementById('headerSub');
   if (sub) sub.textContent = (st.name ? st.name + ' · ' : '') + 'Foodtruck Bosch ProTour · Stundenlohn ' + dec(state.stundenlohn) + ' €/Std · Sync via GitHub';
@@ -527,6 +538,7 @@ function abrechnungCalc(mid) {
 /* ════════════════════════ RENDER: NAV ════════════════════════ */
 const SUBS = [
   { id:'zeit', label:'⏱ Zeiterfassung' },
+  { id:'lenkzeiten', label:'🚗 Lenkzeiten' },
   { id:'reiseplan', label:'🗺 Reiseplan' },
   { id:'auslagen', label:'🧾 Auslagen' },
   { id:'abrechnung', label:'💶 Abrechnung' },
@@ -1195,6 +1207,161 @@ function updRate(i,k,v){
   save(); render();
 }
 
+/* ════════════════════════ RENDER: LENKZEITEN (EU VO (EG) 561/2006) ════════════════════════ */
+const LZ = {
+  DAY_NORMAL: 540,   // 9:00 h
+  DAY_MAX:    600,   // 10:00 h (max 2×/Woche)
+  BREAK_AFTER:270,   // 4:30 h Lenkzeit → Pause fällig
+  BREAK_MIN:   45,   // 45 min Pflichtpause
+  WEEK_MAX:  3360,   // 56:00 h / Woche
+  BIWEEK_MAX:5400,   // 90:00 h / 2 Wochen
+  REST_REG:   660,   // 11:00 h reguläre Tagesruhe
+  REST_RED:   540    // 9:00 h reduzierte Tagesruhe (min.)
+};
+
+function lzArr() {
+  const m = state.months[curMonth];
+  if (!Array.isArray(m.lenkzeiten)) m.lenkzeiten = [];
+  return m.lenkzeiten;
+}
+function addLz()        { lzArr().push({ datum:'', start:'', ende:'', pause:'0:45', strecke:'' }); save(); render(); }
+function updLz(i,k,v)   { lzArr()[i][k] = v; save(); render(); }
+function delLz(i)       { if (confirm('Lenkzeit-Eintrag löschen?')) { lzArr().splice(i,1); save(); render(); } }
+
+function lzCalc(e) {
+  const s = pMin(e.start), en = pMin(e.ende);
+  if (s == null || en == null) return { span:null, pause:pMin(e.pause)||0, drive:null, warns:[] };
+  let span = en - s; if (span <= 0) span += 1440;   // über Mitternacht
+  const pause = pMin(e.pause) || 0;
+  const drive = Math.max(0, span - pause);
+  const warns = [];
+  if (drive > LZ.DAY_MAX)        warns.push(['err',  'Tageslenkzeit > 10:00 h – absolutes Maximum überschritten (Art. 6 Abs. 1)']);
+  else if (drive > LZ.DAY_NORMAL) warns.push(['warn', 'Verlängerte Tageslenkzeit (> 9:00 h) – max. 2×/Woche zulässig (Art. 6 Abs. 1)']);
+  if (drive > LZ.BREAK_AFTER && pause < LZ.BREAK_MIN) warns.push(['err', 'Lenkunterbrechung < 45 min bei > 4:30 h Lenkzeit (Art. 7)']);
+  return { span, pause, drive, warns };
+}
+
+function weekMonday(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const k = (x.getDay() + 6) % 7;   // Mo=0 … So=6
+  x.setDate(x.getDate() - k);
+  return x;
+}
+function fDate(d) { return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.'; }
+
+function lzAllEntries() {
+  const list = [];
+  MONTHS.forEach(mo => {
+    const arr = (state.months[mo.id] && state.months[mo.id].lenkzeiten) || [];
+    arr.forEach((e, idx) => {
+      const day = parseInt(String(e.datum), 10);
+      if (!day) return;
+      const c = lzCalc(e);
+      const sm = pMin(e.start);
+      const startDt = sm != null
+        ? new Date(mo.year, mo.num-1, day, Math.floor(sm/60), sm%60)
+        : new Date(mo.year, mo.num-1, day);
+      const endDt = c.span != null ? new Date(startDt.getTime() + c.span*60000) : null;
+      list.push({ mo:mo.id, idx, e, c, day, num:mo.num, year:mo.year, startDt, endDt });
+    });
+  });
+  list.sort((a,b) => a.startDt - b.startDt);
+  return list;
+}
+
+function lzWeeks() {
+  const all = lzAllEntries();
+  for (let i = 0; i < all.length; i++) {
+    all[i].restBefore = (i > 0 && all[i-1].endDt && all[i].startDt)
+      ? Math.round((all[i].startDt - all[i-1].endDt) / 60000) : null;
+  }
+  const map = new Map();
+  all.forEach(it => {
+    const key = weekMonday(it.startDt).getTime();
+    if (!map.has(key)) map.set(key, { monday: weekMonday(it.startDt), drive:0, days:0, tenH:0 });
+    const w = map.get(key);
+    if (it.c.drive != null) { w.drive += it.c.drive; if (it.c.drive > LZ.DAY_NORMAL) w.tenH++; }
+    w.days++;
+  });
+  const arr = [...map.values()].sort((a,b) => a.monday - b.monday);
+  for (let i = 0; i < arr.length; i++) arr[i].biweek = arr[i].drive + (i>0 ? arr[i-1].drive : 0);
+  return { all, weeks: arr };
+}
+
+function renderLenkzeiten() {
+  const meta = monthMeta(curMonth);
+  const arr  = lzArr();
+  const { all, weeks } = lzWeeks();
+
+  let monthDrive = 0;
+  arr.forEach(e => { const c = lzCalc(e); if (c.drive != null) monthDrive += c.drive; });
+
+  const tw = weeks.find(w => weekMonday(new Date()).getTime() === w.monday.getTime());
+
+  const kpis = `<div class="kpi-row">
+    <div class="kpi"><div class="v">${fDur(monthDrive)}</div><div class="l">Lenkzeit ${meta.name} gesamt</div></div>
+    <div class="kpi ${tw && tw.drive > LZ.WEEK_MAX ? 'gold' : 'green'}"><div class="v">${tw ? fDur(tw.drive) : '00:00'}</div><div class="l">aktuelle Woche (max 56:00)</div></div>
+    <div class="kpi"><div class="v">${arr.length}</div><div class="l">Fahrtage erfasst (${meta.name})</div></div>
+  </div>`;
+
+  const rows = arr.map((e,i) => {
+    const c = lzCalc(e);
+    const icon = c.warns.length
+      ? c.warns.map(w => `<span title="${esc(w[1])}" style="cursor:help;">${w[0]==='err'?'❌':'⚠️'}</span>`).join(' ')
+      : '<span style="color:#28a745;">✓</span>';
+    return `<tr>
+      <td><input class="t" style="width:64px" value="${esc(e.datum)}" placeholder="TT.MM." onchange="updLz(${i},'datum',this.value)"></td>
+      <td><input class="w-full" value="${esc(e.strecke)}" placeholder="von → nach" onchange="updLz(${i},'strecke',this.value)"></td>
+      <td><input class="t" value="${esc(e.start)}" placeholder="15:00" onchange="updLz(${i},'start',this.value)"></td>
+      <td><input class="t" value="${esc(e.ende)}" placeholder="18:30" onchange="updLz(${i},'ende',this.value)"></td>
+      <td><input class="t" value="${esc(e.pause)}" placeholder="0:45" onchange="updLz(${i},'pause',this.value)"></td>
+      <td class="computed">${c.drive==null?'–':fDur(c.drive)}</td>
+      <td style="text-align:center;">${icon}</td>
+      <td><button class="btn small red" onclick="delLz(${i})">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  const wkRows = weeks.map(w => {
+    const wend = new Date(w.monday.getTime() + 6*86400000);
+    const weekFlag = w.drive > LZ.WEEK_MAX
+      ? '<span title="Wochenlenkzeit > 56:00 h (Art. 6 Abs. 2)">❌</span>'
+      : (w.tenH > 2 ? '<span title="mehr als 2× verlängerte Tageslenkzeit in der Woche (Art. 6 Abs. 1)">⚠️</span>' : '<span style="color:#28a745;">✓</span>');
+    const biFlag = w.biweek > LZ.BIWEEK_MAX ? ' <span title="2-Wochen-Lenkzeit > 90:00 h (Art. 6 Abs. 3)">❌</span>' : '';
+    return `<tr>
+      <td>KW ${fDate(w.monday)}–${fDate(wend)}</td>
+      <td style="text-align:right;font-weight:700;color:#2c5f8a;">${fDur(w.drive)}</td>
+      <td style="text-align:center;">${w.tenH}</td>
+      <td style="text-align:right;">${fDur(w.biweek)}${biFlag}</td>
+      <td style="text-align:center;">${weekFlag}</td>
+    </tr>`;
+  }).join('');
+
+  const restWarn = all.filter(it => it.restBefore != null && it.restBefore < LZ.REST_REG).map(it => {
+    const sev = it.restBefore < LZ.REST_RED ? '❌' : '⚠️';
+    const txt = it.restBefore < LZ.REST_RED
+      ? '(< 9:00 h – unzulässig, Art. 8 Abs. 2)'
+      : '(reduziert 9–11 h – max. 3× zwischen zwei Wochenruhezeiten, Art. 8 Abs. 4)';
+    return `<li>${sev} ${String(it.day).padStart(2,'0')}.${String(it.num).padStart(2,'0')}.: Tagesruhe davor nur ${fDur(it.restBefore)} ${txt}</li>`;
+  }).join('');
+
+  return `${kpis}
+  <div class="hint">⚖ <b>EU-Lenk- und Ruhezeiten (VO (EG) 561/2006):</b> Tageslenkzeit max. <b>9:00 h</b> (2×/Woche 10:00 h) · nach <b>4:30 h</b> Lenkzeit Pflichtpause <b>45 min</b> · Woche (Mo–So) max. <b>56:00 h</b> · zwei aufeinanderfolgende Wochen max. <b>90:00 h</b> · tägliche Ruhe min. <b>11:00 h</b> (reduziert 9 h, max. 3×). <b>Lenkzeit = Ende − Start − Pause.</b></div>
+  <div class="toolbar"><button class="btn green" onclick="addLz()">+ Fahrt / Lenktag hinzufügen</button></div>
+  <div class="table-scroll"><table class="grid">
+    <thead><tr><th style="width:74px">Datum</th><th>Strecke (von → nach)</th><th style="width:72px">Start</th><th style="width:72px">Ende</th><th style="width:72px">Pause</th><th style="width:84px">Lenkzeit</th><th style="width:60px">Regel</th><th style="width:46px"></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="8" style="color:#999;font-style:italic;padding:14px;">Noch keine Lenkzeiten für '+meta.name+' erfasst.</td></tr>'}</tbody>
+  </table></div>
+  <div class="panel" style="margin-top:16px;">
+    <h3>📅 Wochen-Lenkzeiten (alle Monate, Mo–So)</h3>
+    <div class="table-scroll"><table class="grid">
+      <thead><tr><th>Kalenderwoche</th><th style="text-align:right;">Lenkzeit Woche</th><th style="text-align:center;">10 h-Tage</th><th style="text-align:right;">Σ 2 Wochen</th><th style="text-align:center;">Status</th></tr></thead>
+      <tbody>${wkRows || '<tr><td colspan="5" style="color:#999;font-style:italic;padding:14px;">Noch keine Fahrten erfasst.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  ${restWarn ? `<div class="hint" style="border-left-color:#c0392b;background:#fdecea;color:#7a0000;"><b>Tagesruhe-Hinweise:</b><ul style="margin:6px 0 0 18px;">${restWarn}</ul></div>` : ''}
+  <div class="hint blue" style="font-size:0.74rem;">Unterstützungs-Tool zur Eigenübersicht – ersetzt nicht den digitalen Fahrtenschreiber / die Fahrerkarte (VO (EU) 165/2014). Die Pausen-Prüfung wertet nur die Gesamtpause je Tag, nicht deren Lage (15+30-Aufteilung). Maßgeblich bleiben die Tacho-Aufzeichnungen.</div>`;
+}
+
 /* ════════════════════════ MAIN RENDER ════════════════════════ */
 function render() {
   if (!state) return;
@@ -1202,6 +1369,7 @@ function render() {
   const main = document.getElementById('main');
   switch(curSub) {
     case 'zeit': main.innerHTML = renderZeit(); break;
+    case 'lenkzeiten': main.innerHTML = renderLenkzeiten(); break;
     case 'reiseplan': main.innerHTML = renderReiseplan(); break;
     case 'auslagen': main.innerHTML = renderAuslagen(); break;
     case 'abrechnung': main.innerHTML = renderAbrechnung(); break;
