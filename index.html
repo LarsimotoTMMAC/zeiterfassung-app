@@ -76,6 +76,9 @@
   .kpi.green .v { color: #155724; }
   .kpi.gold .v { color: #856404; }
   .kpi.purple .v { color: #5a1a8a; }
+  .kpi.red .v { color: #c0392b; }
+  tr.ausn-row textarea { width: 100%; border: 1px solid #d6c48a; border-radius: 4px; }
+  tr.ausn-row label { font-size: 0.82rem; }
 
   .hint { background: #fff8e8; border-left: 4px solid #f0ad00; padding: 10px 14px; font-size: 0.8rem; color: #664d03; border-radius: 0 6px 6px 0; margin-bottom: 14px; }
   .hint.blue { background: #eaf3fb; border-left-color: #2980b9; color: #1a5799; }
@@ -1216,8 +1219,48 @@ const LZ = {
   WEEK_MAX:  3360,   // 56:00 h / Woche
   BIWEEK_MAX:5400,   // 90:00 h / 2 Wochen
   REST_REG:   660,   // 11:00 h reguläre Tagesruhe
-  REST_RED:   540    // 9:00 h reduzierte Tagesruhe (min.)
+  REST_RED:   540,   // 9:00 h reduzierte Tagesruhe (min.)
+  WK_REST_MIN:1440,  // 24:00 h – kürzeste (reduzierte) Wochenruhe
+  WK_REST_REG:2700,  // 45:00 h – reguläre Wochenruhe
+  SIX_DAY:    8640   // 6 × 24 h – spätester Beginn der Wochenruhe (Art. 8 Abs. 6)
 };
+
+// Ausnahme-Tatbestände, die der Fahrer pro Eintrag anklicken kann
+const AUSN = [
+  { v:'art12_1', l:'Art. 12 ¶1 – Weiterfahrt zum sicheren Halteplatz (Schutz Fahrzeug/Ladung/Person)' },
+  { v:'art12_2', l:'Art. 12 ¶2 – +1 h Heimfahrt/Betriebssitz für die Wochenruhe' },
+  { v:'art12_3', l:'Art. 12 ¶3 – +2 h zur regulären Wochenruhe (30-min-Pause unmittelbar vorher)' },
+  { v:'ruhe_red_tag',   l:'Reduzierte Tagesruhe 9 h bewusst genutzt (Art. 8 Abs. 4, max. 3×/Woche)' },
+  { v:'ruhe_red_woche', l:'Reduzierte Wochenruhe 24 h genutzt (Ausgleichspflicht, Art. 8 Abs. 6)' },
+  { v:'sonstige', l:'Sonstige / höhere Gewalt' }
+];
+function ausnLabel(v){ const a = AUSN.find(x=>x.v===v); return a ? a.l : ''; }
+
+// Welche Detail-/Ausnahme-Formulare gerade offen sind
+let lzEdit = {};
+function toggleLzEdit(i){ const k = curMonth+'#'+i; lzEdit[k] = !lzEdit[k]; render(); }
+
+// Geltungsbereich: 'frei' = freiwillig/vertraglich (Werkverkehr/Foodtruck), 'auto' = nach Datum, 'bind' = gesetzlich
+function lzGeltung(){ return state.lzGeltung || 'frei'; }
+function setGeltung(v){ state.lzGeltung = v; save(); render(); }
+function lzBindAt(it){
+  const g = lzGeltung();
+  if (g === 'bind') return true;
+  if (g === 'frei') return false;
+  return !!(it && it.startDt && it.startDt >= new Date(2026,6,1));   // auto: 561/2006 ab 01.07.2026
+}
+
+// Vorbefüllter Art.-12-Textbaustein für die Begründung
+function fillAusnGrund(i){
+  const e = lzArr()[i]; const c = lzCalc(e);
+  const ov = pMin(e.ueberMin) || c.over || 0;
+  const ovTxt = ov ? fDur(ov) + ' ' : '';
+  e.ausnahmeGrund = 'Art. 12 VO 561/2006 – Überschreitung der Tageslenkzeit (10 h) um ' + ovTxt
+    + 'wegen unvorhersehbarer Umstände auf der Route. Weiterfahrt zum gesicherten Halteplatz zur Sicherung von Fahrzeug und Roadshow-Equipment. '
+    + 'Fahrtüchtigkeit gegeben, Verkehrssicherheit nicht gefährdet. Vermerk auf Tachograph-Ausdruck erfolgt.';
+  e.ausnahme = true;
+  save(); render();
+}
 
 function lzArr() {
   const m = state.months[curMonth];
@@ -1230,15 +1273,16 @@ function delLz(i)       { if (confirm('Lenkzeit-Eintrag löschen?')) { lzArr().s
 
 function lzCalc(e) {
   const s = pMin(e.start), en = pMin(e.ende);
-  if (s == null || en == null) return { span:null, pause:pMin(e.pause)||0, drive:null, warns:[] };
+  if (s == null || en == null) return { span:null, pause:pMin(e.pause)||0, drive:null, over:0, warns:[] };
   let span = en - s; if (span <= 0) span += 1440;   // über Mitternacht
   const pause = pMin(e.pause) || 0;
   const drive = Math.max(0, span - pause);
+  const over  = Math.max(0, drive - LZ.DAY_MAX);    // Minuten über dem 10-h-Maximum
   const warns = [];
   if (drive > LZ.DAY_MAX)        warns.push(['err',  'Tageslenkzeit > 10:00 h – absolutes Maximum überschritten (Art. 6 Abs. 1)']);
   else if (drive > LZ.DAY_NORMAL) warns.push(['warn', 'Verlängerte Tageslenkzeit (> 9:00 h) – max. 2×/Woche zulässig (Art. 6 Abs. 1)']);
   if (drive > LZ.BREAK_AFTER && pause < LZ.BREAK_MIN) warns.push(['err', 'Lenkunterbrechung < 45 min bei > 4:30 h Lenkzeit (Art. 7)']);
-  return { span, pause, drive, warns };
+  return { span, pause, drive, over, warns };
 }
 
 function weekMonday(d) {
@@ -1288,38 +1332,151 @@ function lzWeeks() {
   return { all, weeks: arr };
 }
 
+/* 6-Tage-Regel (Art. 8 Abs. 6): nach spätestens 6×24 h seit Ende der letzten Wochenruhe
+   muss eine neue Wochenruhe beginnen. Eine Lücke ≥ 24 h zwischen zwei Fahrten = Wochenruhe. */
+function lzBlocks(all) {
+  const blocks = [];
+  let cur = null;
+  for (let i = 0; i < all.length; i++) {
+    const it = all[i];
+    const rest = it.restBefore;
+    const weeklyRest = (i > 0 && rest != null && rest >= LZ.WK_REST_MIN);
+    if (cur == null) {
+      cur = { start: it.startDt, end: it.endDt || it.startDt, lastDay: 1, closedBy: null, anyViol: false };
+      blocks.push(cur);
+    } else if (weeklyRest) {
+      cur.closedBy = rest;                 // bisheriger Block durch Wochenruhe geschlossen
+      cur = { start: it.startDt, end: it.endDt || it.startDt, lastDay: 1, closedBy: null, anyViol: false };
+      blocks.push(cur);
+    }
+    const elapsed = (it.startDt - cur.start) / 60000;   // Minuten seit Blockbeginn
+    it.dayInBlock = Math.floor(elapsed / 1440) + 1;     // 24-h-Periode (1-basiert)
+    it.sixViol = elapsed >= LZ.SIX_DAY;                 // beginnt nach 6×24 h ohne Wochenruhe
+    if (it.sixViol) cur.anyViol = true;
+    cur.lastDay = it.dayInBlock;
+    cur.end = it.endDt || it.startDt;
+  }
+  return blocks;
+}
+
 function renderLenkzeiten() {
   const meta = monthMeta(curMonth);
   const arr  = lzArr();
   const { all, weeks } = lzWeeks();
+  const blocks = lzBlocks(all);
+  const g = lzGeltung();
 
   let monthDrive = 0;
   arr.forEach(e => { const c = lzCalc(e); if (c.drive != null) monthDrive += c.drive; });
 
   const tw = weeks.find(w => weekMonday(new Date()).getTime() === w.monday.getTime());
 
+  // 6-Tage-KPI aus dem letzten (offenen) Block
+  const openBlock = blocks.length ? blocks[blocks.length-1] : null;
+  let sixKpi = '<div class="kpi"><div class="v">–</div><div class="l">6-Tage-Regel</div></div>';
+  if (openBlock && openBlock.closedBy == null) {
+    const used = openBlock.lastDay || 1;
+    const remaining = 6 - used;
+    const cls = openBlock.anyViol ? 'red' : (used >= 6 ? 'gold' : 'green');
+    const txt = openBlock.anyViol ? 'Wochenruhe überfällig!'
+      : (remaining <= 0 ? 'Wochenruhe jetzt fällig' : 'noch ' + remaining + ' Tag(e) bis Pflicht-Wochenruhe');
+    const deadline = new Date(openBlock.start.getTime() + LZ.SIX_DAY*60000);
+    sixKpi = `<div class="kpi ${cls}"><div class="v">Tag ${used}/6</div><div class="l">${txt}<br><span style="font-size:0.7rem;opacity:.85;">spät. Ruhebeginn: ${fDate(deadline)}</span></div></div>`;
+  }
+
   const kpis = `<div class="kpi-row">
     <div class="kpi"><div class="v">${fDur(monthDrive)}</div><div class="l">Lenkzeit ${meta.name} gesamt</div></div>
     <div class="kpi ${tw && tw.drive > LZ.WEEK_MAX ? 'gold' : 'green'}"><div class="v">${tw ? fDur(tw.drive) : '00:00'}</div><div class="l">aktuelle Woche (max 56:00)</div></div>
+    ${sixKpi}
     <div class="kpi"><div class="v">${arr.length}</div><div class="l">Fahrtage erfasst (${meta.name})</div></div>
+  </div>`;
+
+  // Geltungsbereich-Umschalter
+  const gOpt = (v,l) => `<option value="${v}" ${g===v?'selected':''}>${l}</option>`;
+  const gText = g==='frei'
+      ? 'Foodtruck mit Kunden-Branding = eigenes Werbefahrzeug (<b>Werkverkehr</b>). Bei 2,5–3,5 t erfasst die Ausweitung ab 01.07.2026 nur <b>gewerbliche Güterbeförderung (hire/reward)</b> → 561/2006 greift hier <b>vermutlich nicht gesetzlich</b>. Prüfung als <b>Eigenübersicht / Vertragstreue</b>; das <b>ArbZG</b> (max. 10 h, 11 h Ruhe) gilt unabhängig. <i>Verbindliche Einstufung bei der Agentur einholen.</i>'
+    : g==='auto'
+      ? 'Vor dem 01.07.2026 außerhalb 561/2006, ab 01.07.2026 (grenzüberschr. gewerblich) gesetzlich bindend — pro Eintrag nach Datum.'
+      : 'Alle Abweichungen werden als <b>gesetzliche Verstöße</b> (VO (EG) 561/2006) gewertet.';
+  const gBanner = `<div class="hint ${g==='frei'?'blue':''}" style="${g==='bind'?'border-left-color:#c0392b;background:#fdecea;color:#7a0000;':''}">
+    <label style="font-weight:700;">⚖ Geltungsbereich:
+      <select onchange="setGeltung(this.value)">
+        ${gOpt('frei','Freiwillig / vertraglich – Werkverkehr (Foodtruck) ≤ 3,5 t')}
+        ${gOpt('auto','Automatisch nach Datum (561/2006 ab 01.07.2026)')}
+        ${gOpt('bind','Gesetzlich bindend (561/2006)')}
+      </select>
+    </label>
+    <div style="margin-top:6px;font-size:0.78rem;font-weight:400;">${gText}</div>
   </div>`;
 
   const rows = arr.map((e,i) => {
     const c = lzCalc(e);
-    const icon = c.warns.length
-      ? c.warns.map(w => `<span title="${esc(w[1])}" style="cursor:help;">${w[0]==='err'?'❌':'⚠️'}</span>`).join(' ')
-      : '<span style="color:#28a745;">✓</span>';
-    return `<tr>
+    const it = all.find(x => x.mo === curMonth && x.idx === i);
+    const bind = lzBindAt(it);
+    // Status-Icon inkl. Ausnahme-Reklassifizierung
+    let icon;
+    if (!c.warns.length) icon = '<span style="color:#28a745;">✓</span>';
+    else if (e.ausnahme) {
+      icon = '<span title="Abweichung dokumentiert: '+esc(ausnLabel(e.ausnahmeArt)||'Ausnahme')+'" style="cursor:help;">🟡</span>';
+      if (!e.vermerkAusdruck) icon += ' <span title="Pflicht-Vermerk auf Tachograph-Ausdruck fehlt!" style="cursor:help;">📝❗</span>';
+    } else {
+      icon = c.warns.map(w => `<span title="${esc(w[1])}" style="cursor:help;">${w[0]==='err'?(bind?'❌':'⚠️'):'⚠️'}</span>`).join(' ');
+    }
+    // 6-Tage-Block-Marker
+    let blk = '–';
+    if (it && it.dayInBlock) {
+      blk = it.sixViol
+        ? `<span title="über 6×24 h ohne Wochenruhe (Art. 8 Abs. 6)" style="color:#c0392b;font-weight:700;cursor:help;">${it.dayInBlock}/6 ❌</span>`
+        : `<span style="color:${it.dayInBlock>=6?'#856404':'#2c5f8a'};font-weight:600;">${it.dayInBlock}/6</span>`;
+    }
+    const key = curMonth+'#'+i;
+    const open = e.ausnahme || lzEdit[key];
+    const mainRow = `<tr>
       <td><input class="t" style="width:64px" value="${esc(e.datum)}" placeholder="TT.MM." onchange="updLz(${i},'datum',this.value)"></td>
       <td><input class="w-full" value="${esc(e.strecke)}" placeholder="von → nach" onchange="updLz(${i},'strecke',this.value)"></td>
       <td><input class="t" value="${esc(e.start)}" placeholder="15:00" onchange="updLz(${i},'start',this.value)"></td>
       <td><input class="t" value="${esc(e.ende)}" placeholder="18:30" onchange="updLz(${i},'ende',this.value)"></td>
       <td><input class="t" value="${esc(e.pause)}" placeholder="0:45" onchange="updLz(${i},'pause',this.value)"></td>
       <td class="computed">${c.drive==null?'–':fDur(c.drive)}</td>
+      <td style="text-align:center;">${blk}</td>
       <td style="text-align:center;">${icon}</td>
-      <td><button class="btn small red" onclick="delLz(${i})">✕</button></td>
+      <td style="white-space:nowrap;"><button class="btn small ${e.ausnahme?'gold':'ghost'}" title="Ausnahme / Art. 12 dokumentieren" onclick="toggleLzEdit(${i})">⚖</button> <button class="btn small red" onclick="delLz(${i})">✕</button></td>
     </tr>`;
+    if (!open) return mainRow;
+    const sel = `<select onchange="updLz(${i},'ausnahmeArt',this.value)"><option value="">– Rechtsgrundlage wählen –</option>${AUSN.map(a=>`<option value="${a.v}" ${e.ausnahmeArt===a.v?'selected':''}>${esc(a.l)}</option>`).join('')}</select>`;
+    const detail = `<tr class="ausn-row"><td colspan="9" style="background:#fffbea;">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;">
+        <label style="font-weight:700;"><input type="checkbox" ${e.ausnahme?'checked':''} onchange="updLz(${i},'ausnahme',this.checked)"> Ausnahme geltend gemacht</label>
+        <label>Überschreitung <input class="t" style="width:60px" value="${esc(e.ueberMin||'')}" placeholder="${c.over?fDur(c.over):'0:15'}" onchange="updLz(${i},'ueberMin',this.value)"></label>
+        <label style="font-weight:700;color:#7a0000;"><input type="checkbox" ${e.vermerkAusdruck?'checked':''} onchange="updLz(${i},'vermerkAusdruck',this.checked)"> Vermerk auf Tachograph-Ausdruck erfolgt</label>
+      </div>
+      <div style="margin-top:8px;">${sel}</div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:flex-start;">
+        <textarea rows="3" placeholder="Begründung – bei Art. 12 muss der Grund zusätzlich handschriftlich auf den Tacho-Ausdruck!" onchange="updLz(${i},'ausnahmeGrund',this.value)" style="font-family:inherit;font-size:0.84rem;padding:6px;">${esc(e.ausnahmeGrund||'')}</textarea>
+        <button class="btn small ghost" onclick="fillAusnGrund(${i})" title="Art.-12-Textbaustein einfügen">📋 Baustein</button>
+      </div>
+      ${e.ausnahme && !e.vermerkAusdruck ? '<div style="margin-top:6px;color:#7a0000;font-size:0.8rem;font-weight:700;">📝❗ Bei Art. 12 ist der handschriftliche Vermerk auf dem Tachograph-Ausdruck rechtlich zwingend – spätestens bei Ankunft am Halteplatz.</div>' : ''}
+    </td></tr>`;
+    return mainRow + detail;
   }).join('');
+
+  // Wochenruhe-Blöcke (6-Tage-Regel)
+  const blkRows = blocks.map(b => {
+    const span = b.end ? Math.round((b.end - b.start)/60000) : 0;
+    const days = b.lastDay || 1;
+    let status;
+    if (b.anyViol) status = '<span style="color:#c0392b;font-weight:700;">❌ 6-Tage-Regel überschritten</span>';
+    else if (b.closedBy != null) status = b.closedBy >= LZ.WK_REST_REG
+      ? '<span style="color:#155724;">✓ reguläre Wochenruhe ('+fDur(b.closedBy)+')</span>'
+      : '<span style="color:#856404;">⚠️ reduzierte Wochenruhe ('+fDur(b.closedBy)+') – Ausgleich nötig</span>';
+    else status = days>=6
+      ? '<span style="color:#856404;font-weight:700;">⏳ offen – Wochenruhe jetzt fällig</span>'
+      : '<span style="color:#2c5f8a;">⏳ offen – Tag '+days+'/6</span>';
+    return `<tr><td>${fDate(b.start)}${b.end?'–'+fDate(b.end):''}</td><td style="text-align:center;">${days}</td><td style="text-align:right;">${fDur(span)}</td><td>${status}</td></tr>`;
+  }).join('');
+
+  // Ausgleichs-Schuld aus reduzierten Wochenruhen
+  let debt = 0; blocks.forEach(b => { if (b.closedBy != null && b.closedBy < LZ.WK_REST_REG) debt += (LZ.WK_REST_REG - b.closedBy); });
 
   const wkRows = weeks.map(w => {
     const wend = new Date(w.monday.getTime() + 6*86400000);
@@ -1345,12 +1502,21 @@ function renderLenkzeiten() {
   }).join('');
 
   return `${kpis}
-  <div class="hint">⚖ <b>EU-Lenk- und Ruhezeiten (VO (EG) 561/2006):</b> Tageslenkzeit max. <b>9:00 h</b> (2×/Woche 10:00 h) · nach <b>4:30 h</b> Lenkzeit Pflichtpause <b>45 min</b> · Woche (Mo–So) max. <b>56:00 h</b> · zwei aufeinanderfolgende Wochen max. <b>90:00 h</b> · tägliche Ruhe min. <b>11:00 h</b> (reduziert 9 h, max. 3×). <b>Lenkzeit = Ende − Start − Pause.</b></div>
-  <div class="toolbar"><button class="btn green" onclick="addLz()">+ Fahrt / Lenktag hinzufügen</button></div>
-  <div class="table-scroll"><table class="grid">
-    <thead><tr><th style="width:74px">Datum</th><th>Strecke (von → nach)</th><th style="width:72px">Start</th><th style="width:72px">Ende</th><th style="width:72px">Pause</th><th style="width:84px">Lenkzeit</th><th style="width:60px">Regel</th><th style="width:46px"></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="8" style="color:#999;font-style:italic;padding:14px;">Noch keine Lenkzeiten für '+meta.name+' erfasst.</td></tr>'}</tbody>
+  ${gBanner}
+  <div class="hint">⚖ <b>EU-Lenk- und Ruhezeiten (VO (EG) 561/2006):</b> Tageslenkzeit max. <b>9:00 h</b> (2×/Woche 10:00 h) · nach <b>4:30 h</b> Pflichtpause <b>45 min</b> · Woche (Mo–So) max. <b>56:00 h</b> · zwei Wochen max. <b>90:00 h</b> · Tagesruhe min. <b>11:00 h</b> (red. 9 h, max. 3×) · nach <b>6×24 h</b> Pflicht-Wochenruhe (45 h, red. 24 h). <b>Lenkzeit = Ende − Start − Pause.</b></div>
+  <div class="toolbar"><button class="btn green" onclick="addLz()">+ Fahrt / Lenktag hinzufügen</button><span style="font-size:0.78rem;color:#666;">⚖ = Ausnahme/Art. 12 dokumentieren</span></div>
+  <div class="table-scroll"><table class="grid xwide">
+    <thead><tr><th style="width:74px">Datum</th><th>Strecke (von → nach)</th><th style="width:66px">Start</th><th style="width:66px">Ende</th><th style="width:66px">Pause</th><th style="width:78px">Lenkzeit</th><th style="width:56px" title="6-Tage-Regel">6-Tage</th><th style="width:62px">Regel</th><th style="width:88px"></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="9" style="color:#999;font-style:italic;padding:14px;">Noch keine Lenkzeiten für '+meta.name+' erfasst.</td></tr>'}</tbody>
   </table></div>
+  <div class="panel" style="margin-top:16px;">
+    <h3>🛌 Wochenruhe-Blöcke (6-Tage-Regel, alle Monate)</h3>
+    <div class="table-scroll"><table class="grid">
+      <thead><tr><th>Block (Zeitraum)</th><th style="text-align:center;">Fahrtage</th><th style="text-align:right;">Spanne</th><th>Status</th></tr></thead>
+      <tbody>${blkRows || '<tr><td colspan="4" style="color:#999;font-style:italic;padding:14px;">Noch keine Fahrten erfasst.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+  ${debt>0 ? `<div class="hint" style="border-left-color:#856404;"><b>Ausgleichs-Schuld (reduzierte Wochenruhen):</b> ${fDur(debt)} müssen als zusammenhängende Ruhe vor Ende der dritten Folgewoche nachgeholt werden (Art. 8 Abs. 6).</div>` : ''}
   <div class="panel" style="margin-top:16px;">
     <h3>📅 Wochen-Lenkzeiten (alle Monate, Mo–So)</h3>
     <div class="table-scroll"><table class="grid">
@@ -1359,7 +1525,7 @@ function renderLenkzeiten() {
     </table></div>
   </div>
   ${restWarn ? `<div class="hint" style="border-left-color:#c0392b;background:#fdecea;color:#7a0000;"><b>Tagesruhe-Hinweise:</b><ul style="margin:6px 0 0 18px;">${restWarn}</ul></div>` : ''}
-  <div class="hint blue" style="font-size:0.74rem;">Unterstützungs-Tool zur Eigenübersicht – ersetzt nicht den digitalen Fahrtenschreiber / die Fahrerkarte (VO (EU) 165/2014). Die Pausen-Prüfung wertet nur die Gesamtpause je Tag, nicht deren Lage (15+30-Aufteilung). Maßgeblich bleiben die Tacho-Aufzeichnungen.</div>`;
+  <div class="hint blue" style="font-size:0.74rem;">Unterstützungs-Tool zur Eigenübersicht – ersetzt nicht den digitalen Fahrtenschreiber / die Fahrerkarte (VO (EU) 165/2014). <b>Ausnahmen nach Art. 12 erfordern den handschriftlichen Vermerk auf dem Tacho-Ausdruck</b> (spätestens bei Ankunft) – dieses Tool dokumentiert sie nur ergänzend. Die Pausen-Prüfung wertet nur die Gesamtpause je Tag, nicht deren Lage (15+30). Maßgeblich bleiben die Tacho-Aufzeichnungen.</div>`;
 }
 
 /* ════════════════════════ MAIN RENDER ════════════════════════ */
