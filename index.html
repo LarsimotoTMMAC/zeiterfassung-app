@@ -203,7 +203,7 @@ const STORAGE_KEY = 'followred_zeiterfassung_sommer2026_v1';
 const STUNDENLOHN_DEFAULT = 20.00;
 
 const DEFAULT_RATES = [
-  { code:'DE',  label:'Deutschland Volltag',    flag:'🇩🇪', rate:28.00, fruehAbzug:false },
+  { code:'DE',  label:'Deutschland Volltag',    flag:'🇩🇪', rate:28.00, fruehAbzug:true },
   { code:'DEA', label:'Deutschland An-/Abreise',flag:'🇩🇪', rate:14.00, fruehAbzug:false },
   { code:'PL',  label:'Polen',                  flag:'🇵🇱', rate:29.00, fruehAbzug:true },
   { code:'SK',  label:'Slowakei',               flag:'🇸🇰', rate:33.00, fruehAbzug:true },
@@ -216,7 +216,9 @@ const DEFAULT_RATES = [
   { code:'CH',  label:'Schweiz',                flag:'🇨🇭', rate:64.00, fruehAbzug:true },
   { code:'AT',  label:'Österreich',             flag:'🇦🇹', rate:50.00, fruehAbzug:true },
   { code:'SI',  label:'Slowenien',              flag:'🇸🇮', rate:38.00, fruehAbzug:true },
-  { code:'CZ',  label:'Tschechien',             flag:'🇨🇿', rate:32.00, fruehAbzug:true }
+  { code:'CZ',  label:'Tschechien',             flag:'🇨🇿', rate:32.00, fruehAbzug:true },
+  { code:'SE',  label:'Schweden (BMF – bitte prüfen)',  flag:'🇸🇪', rate:50.00, fruehAbzug:true },
+  { code:'FI',  label:'Finnland (BMF – bitte prüfen)',  flag:'🇫🇮', rate:50.00, fruehAbzug:true }
 ];
 
 const SV = [
@@ -235,7 +237,8 @@ function getStamm() {
 const MONTHS = [
   { id:'juni',   name:'Juni',   num:6, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0 },
   { id:'juli',   name:'Juli',   num:7, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0 },
-  { id:'august', name:'August', num:8, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0 }
+  { id:'august', name:'August', num:8, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0 },
+  { id:'september', name:'September', num:9, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0 }
 ];
 
 const WOCHENTAGE = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
@@ -828,7 +831,7 @@ function renderAbrechnung() {
   const c = abrechnungCalc(curMonth);
   const idx = MONTHS.findIndex(x=>x.id===curMonth);
   const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
-  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'September';
+  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Oktober';
   const autoUeb = a.uebertragIn == null;
 
   return `
@@ -1079,7 +1082,7 @@ function exportGehalt(mid) {
   const c = abrechnungCalc(mid);
   const idx = MONTHS.findIndex(x=>x.id===mid);
   const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
-  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'September';
+  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Oktober';
 
   let stdRows = '';
   m.days.forEach(d => {
