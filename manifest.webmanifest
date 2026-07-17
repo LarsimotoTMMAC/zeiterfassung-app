@@ -1,0 +1,24 @@
+{
+  "name": "FOLLOWRED Zeiterfassung & Reiseplan",
+  "short_name": "Zeiterfassung",
+  "description": "Zeiterfassung, Spesen und Reiseplan – Bosch Pro Tour 2026",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#e3051b",
+  "theme_color": "#1a3a5c",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
