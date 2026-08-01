@@ -208,6 +208,16 @@ const STORAGE_KEY = 'followred_zeiterfassung_sommer2026_v1';
 const STUNDENLOHN_DEFAULT = 20.00;          // bis einschl. Juli 2026
 const STUNDENLOHN_AB_AUGUST = 23.00;        // Lohnerhöhung zum 01.08.2026
 
+/* Offday-Regelung (Stundenübersicht 2.0, gültig ab 01.08.2026):
+   Offday = KEINE Stunden (Beginn/Ende/Pause/Stunden/Überstunden bleiben leer),
+   stattdessen eine Pauschale von 125,00 € (Excel-Spalte K „Offday" → L „Berechnung Offday").
+   Die Verpflegungspauschale (VMA) des Tages bleibt davon unberührt.
+   Bis einschl. Juli 2026 galt die alte Regel: Offday = 6 h pauschal. */
+const OFFDAY_PAUSCHALE = 125.00;
+const OFFDAY_NEU_AB_JAHR = 2026;
+const OFFDAY_NEU_AB_MONAT = 8;
+const OFFDAY_ALT_MIN = 360;                 // 6 h pauschal (bis einschl. 07/2026)
+
 /* Beitragsbemessungsgrenzen 2026 (monatlich, bundeseinheitlich) –
    greifen erst bei hohen Auszahlungen (z. B. Auflösung des Brutto-Pools). */
 const BBG_KV_PV = 5812.50;
@@ -510,11 +520,20 @@ function lohnFor(mid) {
   return (state && state.stundenlohn) ? state.stundenlohn : STUNDENLOHN_DEFAULT;
 }
 
-function dayCalc(day) {
-  // Rückgabe: { minNetto, dezStd, endeMitPause, spesen }
-  let minNetto = null, endeMitPause = null;
+/* Gilt für diesen Monat schon die neue Offday-Regel (125 € statt 6 h)? */
+function offdayNeu(mid) {
+  const meta = monthMeta(mid || curMonth);
+  if (!meta) return false;
+  return meta.year > OFFDAY_NEU_AB_JAHR || (meta.year === OFFDAY_NEU_AB_JAHR && meta.num >= OFFDAY_NEU_AB_MONAT);
+}
+
+function dayCalc(day, mid) {
+  // Rückgabe: { minNetto, dezStd, endeMitPause, spesen, offPausch }
+  const neu = offdayNeu(mid || curMonth);
+  let minNetto = null, endeMitPause = null, offPausch = 0;
   if (day.typ === 'offday') {
-    minNetto = 360;
+    if (neu) { minNetto = 0; offPausch = OFFDAY_PAUSCHALE; }
+    else { minNetto = OFFDAY_ALT_MIN; }
   } else if (day.typ === 'frei') {
     minNetto = 0;
   } else {
@@ -536,21 +555,26 @@ function dayCalc(day) {
       if (r) spesen = (day.frueh === 'mit' && r.fruehAbzug) ? Math.round(r.rate*0.8*100)/100 : r.rate;
     }
   }
-  return { minNetto, dezStd: minNetto==null?null:minNetto/60, endeMitPause, spesen };
+  return { minNetto, dezStd: minNetto==null?null:minNetto/60, endeMitPause, spesen, offPausch };
 }
 
 function monthSums(mid) {
   const m = state.months[mid];
-  let minB=0, minG=0, spB=0, spG=0, tageB=0, tageG=0;
+  let minB=0, minG=0, spB=0, spG=0, tageB=0, tageG=0, offB=0, offG=0, offTageB=0, offTageG=0;
   m.days.forEach(d => {
     if (d.typ==='frei') return;
-    const c = dayCalc(d);
+    const c = dayCalc(d, mid);
     const mins = c.minNetto||0;
-    if (d.status==='bestaetigt') { minB+=mins; spB+=c.spesen; tageB++; }
-    else { minG+=mins; spG+=c.spesen; tageG++; }
+    if (d.status==='bestaetigt') {
+      minB+=mins; spB+=c.spesen; tageB++;
+      if (c.offPausch>0) { offB+=c.offPausch; offTageB++; }
+    } else {
+      minG+=mins; spG+=c.spesen; tageG++;
+      if (c.offPausch>0) { offG+=c.offPausch; offTageG++; }
+    }
   });
   const auslagen = m.auslagen.reduce((a,x)=>a+(parseFloat(x.betrag)||0),0);
-  return { minB, minG, spB, spG, tageB, tageG, auslagen };
+  return { minB, minG, spB, spG, tageB, tageG, offB, offG, offTageB, offTageG, auslagen };
 }
 
 function uebertragInEffective(mid) {
@@ -569,7 +593,11 @@ function abrechnungCalc(mid) {
   const stdBest = sums.minB/60;
   const stdAbr = (a.stundenAbrechnen != null && a.stundenAbrechnen !== '') ? parseFloat(a.stundenAbrechnen) : stdBest;
   const lohn = lohnFor(mid);
-  const brutto = Math.round(stdAbr * lohn * 100)/100;
+  const bruttoStd = Math.round(stdAbr * lohn * 100)/100;
+  // Offday-Pauschale (125 €/Tag ab 08/2026) – eigene Brutto-Position, nur bestätigte Tage
+  const offBetrag = Math.round(sums.offB*100)/100;
+  const offTage = sums.offTageB;
+  const brutto = Math.round((bruttoStd + offBetrag)*100)/100;
   const uebIn = uebertragInEffective(mid);
   const pool = Math.round((brutto + uebIn)*100)/100;
   const kontoLeeren = !!a.kontoLeeren;
@@ -587,7 +615,7 @@ function abrechnungCalc(mid) {
   const auszahlung = Math.round((nettoNachV + sums.spB + sums.auslagen)*100)/100;
   const uebertragOut = Math.round((pool - auszBrutto)*100)/100;
   const restStd = Math.max(0, stdBest - stdAbr);
-  return { sums, lohn, kontoLeeren, stdBest, stdAbr, brutto, uebIn, pool, auszBrutto, svAbz, lst, abzuege, netto, vorschuss, nettoNachV, auszahlung, uebertragOut, restStd };
+  return { sums, lohn, kontoLeeren, stdBest, stdAbr, bruttoStd, offBetrag, offTage, brutto, uebIn, pool, auszBrutto, svAbz, lst, abzuege, netto, vorschuss, nettoNachV, auszahlung, uebertragOut, restStd };
 }
 
 /* ════════════════════════ RENDER: NAV ════════════════════════ */
@@ -617,11 +645,14 @@ function renderZeit() {
   const meta = monthMeta(curMonth);
   const m = state.months[curMonth];
   const sums = monthSums(curMonth);
+  const offNeu = offdayNeu(curMonth);
+  const offLabel = offNeu ? `Offday ${dec(OFFDAY_PAUSCHALE)} €` : 'Offday 6h';
 
   const kpis = `
   <div class="kpi-row">
     <div class="kpi green"><div class="v">${fDur(sums.minB)}</div><div class="l">Std. bestätigt (${sums.tageB} Tage)</div></div>
     <div class="kpi gold"><div class="v">${fDur(sums.minG)}</div><div class="l">Std. geplant/offen (${sums.tageG} Tage)</div></div>
+    ${offNeu&&(sums.offB+sums.offG)>0?`<div class="kpi"><div class="v">${eur(sums.offB+sums.offG)}</div><div class="l">Offday-Pauschale (${sums.offTageB+sums.offTageG} × ${dec(OFFDAY_PAUSCHALE)} €)</div></div>`:''}
     <div class="kpi green"><div class="v">${eur(sums.spB)}</div><div class="l">Spesen bestätigt</div></div>
     <div class="kpi gold"><div class="v">${eur(sums.spG)}</div><div class="l">Spesen geplant/offen</div></div>
     <div class="kpi"><div class="v">${eur(sums.auslagen)}</div><div class="l">Auslagen</div></div>
@@ -630,7 +661,7 @@ function renderZeit() {
   if (isMobile()) {
     let cards = '';
     m.days.forEach((d, i) => {
-      const c = dayCalc(d);
+      const c = dayCalc(d, curMonth);
       const date = new Date(meta.year, meta.num-1, d.tag);
       const wd = date.getDay();
       const we = (wd===0||wd===6);
@@ -638,7 +669,7 @@ function renderZeit() {
       const typSel = `<select onchange="updDay(${i},'typ',this.value)">
           <option value="einsatz" ${d.typ==='einsatz'?'selected':''}>Einsatz</option>
           <option value="reise" ${d.typ==='reise'?'selected':''}>Reisetag</option>
-          <option value="offday" ${d.typ==='offday'?'selected':''}>Offday 6h</option>
+          <option value="offday" ${d.typ==='offday'?'selected':''}>${offLabel}</option>
           <option value="frei" ${d.typ==='frei'?'selected':''}>Frei/Zuhause</option>
         </select>`;
       const statusSel = d.typ==='frei' ? '' :
@@ -659,7 +690,7 @@ function renderZeit() {
         body += `<div class="dc-row meta">
           <label>Land<select onchange="updDay(${i},'land',this.value)">${state.rates.map(r=>`<option value="${r.code}" ${d.land===r.code?'selected':''}>${r.flag} ${r.code}</option>`).join('')}</select></label>
           <label>Frühstück<select onchange="updDay(${i},'frueh',this.value)"><option value="ohne" ${d.frueh==='ohne'?'selected':''}>ohne</option><option value="mit" ${d.frueh==='mit'?'selected':''}>mit</option></select></label>
-          <label>Std. netto<span class="dc-val">${d.typ==='frei'?'–':fDur(c.minNetto)}</span></label>
+          <label>${c.offPausch>0?'Offday-Pausch.':'Std. netto'}<span class="dc-val">${c.offPausch>0?eur(c.offPausch):(d.typ==='frei'?'–':fDur(c.minNetto))}</span></label>
           <label>Spesen ✎<span class="dc-val sp" onclick="spesenOverrideAt(${i})">${eur(c.spesen)}${d.spesenOverride!==''&&d.spesenOverride!=null?' *':''}</span></label>
         </div>`;
       }
@@ -679,13 +710,14 @@ function renderZeit() {
     <div class="hint blue" style="margin-top:14px;">
       <b>Regeln:</b> Std. netto = Ende − Start (Pause wird NICHT abgezogen, sondern auf die Ende-Zeit aufgeschlagen).
       Frühstück „mit" = −20 % Spesen (außer DE). Spesen-Betrag antippen = manueller Override (* = aktiv).
+      ${offNeu?`<b>Offday ab 01.08.2026:</b> keine Stunden, stattdessen ${dec(OFFDAY_PAUSCHALE)} € Pauschale – Spesen laufen normal weiter.`:'<b>Offday:</b> 6:00 h pauschal ohne Zeiten (Regel bis einschl. 07/2026).'}
       Tag auf <b>bestätigt ✓</b> stellen, sobald die Zeiten final sind – nur bestätigte Tage fließen in die Abrechnung.
     </div>`;
   }
 
   let rows = '';
   m.days.forEach((d, i) => {
-    const c = dayCalc(d);
+    const c = dayCalc(d, curMonth);
     const date = new Date(meta.year, meta.num-1, d.tag);
     const wd = date.getDay();
     const we = (wd===0||wd===6);
@@ -698,7 +730,7 @@ function renderZeit() {
         <select onchange="updDay(${i},'typ',this.value)">
           <option value="einsatz" ${d.typ==='einsatz'?'selected':''}>Einsatz</option>
           <option value="reise" ${d.typ==='reise'?'selected':''}>Reisetag</option>
-          <option value="offday" ${d.typ==='offday'?'selected':''}>Offday 6h</option>
+          <option value="offday" ${d.typ==='offday'?'selected':''}>${offLabel}</option>
           <option value="frei" ${d.typ==='frei'?'selected':''}>Frei/Zuhause</option>
         </select>
       </td>
@@ -708,6 +740,7 @@ function renderZeit() {
       <td>${timesOff?'–':`<input class="t" value="${esc(d.pause)}" placeholder="0:45" onchange="updDay(${i},'pause',this.value)">`}</td>
       <td class="computed pausenende">${timesOff?'–':fMin(c.endeMitPause)}</td>
       <td class="computed">${d.typ==='frei'?'–':fDur(c.minNetto)}</td>
+      ${offNeu?`<td class="computed" style="color:#5a1a8a;font-weight:700;">${c.offPausch>0?eur(c.offPausch):'–'}</td>`:''}
       <td>${d.typ==='frei'?'–':`<select onchange="updDay(${i},'land',this.value)">${state.rates.map(r=>`<option value="${r.code}" ${d.land===r.code?'selected':''}>${r.flag} ${r.code}</option>`).join('')}</select>`}</td>
       <td>${d.typ==='frei'?'–':`<select onchange="updDay(${i},'frueh',this.value)"><option value="ohne" ${d.frueh==='ohne'?'selected':''}>ohne</option><option value="mit" ${d.frueh==='mit'?'selected':''}>mit</option></select>`}</td>
       <td class="spesen-val">${d.typ==='frei'?'–':eur(c.spesen)}${d.spesenOverride!==''&&d.spesenOverride!=null?' *':''}</td>
@@ -718,7 +751,8 @@ function renderZeit() {
   return `${kpis}
   <div class="hint blue">
     <b>Regeln:</b> Std. netto = Ende − Start (Pause wird NICHT abgezogen). Die Pause (Standard 0:45) wird auf die Ende-Zeit aufgeschlagen → Spalte „Ende mit Pause".
-    Offday/Pauschal-Reisetag = 6:00 h ohne Zeiten. Frühstück „mit" = −20 % Spesen (außer DE: kein Abzug). Spesen-Markierung „*" = manueller Override.
+    ${offNeu?`<b>Offday ab 01.08.2026 (Stundenübersicht 2.0):</b> keine Stunden – stattdessen ${dec(OFFDAY_PAUSCHALE)} € Pauschale (Excel-Spalte „Offday" → „Berechnung Offday"). Die Verpflegungspauschale des Tages bleibt erhalten.`:'Offday/Pauschal-Reisetag = 6:00 h ohne Zeiten (Regel bis einschl. 07/2026).'}
+    Frühstück „mit" = −20 % Spesen (außer DE: kein Abzug). Spesen-Markierung „*" = manueller Override.
     Tag auf <b>bestätigt ✓</b> setzen, sobald die Zeiten final sind – nur bestätigte Tage fließen in die Abrechnung.
   </div>
   <div class="toolbar">
@@ -731,12 +765,14 @@ function renderZeit() {
       <th style="width:74px">Datum</th><th style="width:110px">Typ</th><th>Tätigkeit / Route</th>
       <th style="width:72px">Start</th><th style="width:72px">Ende</th><th style="width:72px">Pause</th>
       <th style="width:80px">Ende m. P.</th><th style="width:70px">Std. netto</th>
+      ${offNeu?'<th style="width:86px">Offday</th>':''}
       <th style="width:92px">Land</th><th style="width:80px">Frühstück</th><th style="width:90px">Spesen</th><th style="width:110px">Status</th>
     </tr></thead>
     <tbody ondblclick="spesenOverridePrompt(event)">${rows}</tbody>
     <tfoot><tr>
       <td colspan="7">Gesamt (bestätigt + geplant)</td>
       <td>${fDur(sums.minB+sums.minG)}</td>
+      ${offNeu?`<td>${eur(sums.offB+sums.offG)}</td>`:''}
       <td colspan="2"></td>
       <td>${eur(sums.spB+sums.spG)}</td><td></td>
     </tr></tfoot>
@@ -914,7 +950,9 @@ function renderAbrechnung() {
   <div class="panel">
     <h3>Brutto-Pool ${meta.name} 2026</h3>
     <table class="calc">
-      <tr><td>Stundenlohn ${meta.name}: ${dec(c.stdAbr)} Std × ${dec(c.lohn)} €</td><td>${eur(c.brutto)}</td></tr>
+      <tr><td>Stundenlohn ${meta.name}: ${dec(c.stdAbr)} Std × ${dec(c.lohn)} €</td><td>${eur(c.bruttoStd)}</td></tr>
+      ${c.offBetrag>0?`<tr><td>+ Offday-Pauschale: ${c.offTage} × ${dec(OFFDAY_PAUSCHALE)} € <span style="font-size:0.76rem;color:#888;">(ab 01.08.2026, nur bestätigte Tage)</span></td><td>+ ${eur(c.offBetrag)}</td></tr>
+      <tr class="sum"><td>= Gesamt-Brutto ${meta.name}</td><td>${eur(c.brutto)}</td></tr>`:''}
       <tr class="gold"><td>+ Restbrutto-Übertrag ${prevName}</td><td>+ ${eur(c.uebIn)}</td></tr>
       <tr class="sum"><td>= Brutto-Pool gesamt</td><td>${eur(c.pool)}</td></tr>
       <tr class="red"><td>./. Ausgezahltes Brutto (diese Abrechnung)${c.kontoLeeren?' <span class="badge b-best">Konto geleert</span>':''}</td><td>− ${eur(c.auszBrutto)}</td></tr>
@@ -945,7 +983,7 @@ function renderAbrechnung() {
       <tr class="total"><td>Auszahlungsbetrag gesamt</td><td>${eur(c.auszahlung)}</td></tr>
     </table>
   </div>
-  ${c.sums.tageG>0?`<div class="hint">⚠️ ${c.sums.tageG} Tag(e) stehen noch auf „geplant" – deren Stunden (${fDur(c.sums.minG)}) und Spesen (${eur(c.sums.spG)}) sind NICHT in dieser Abrechnung. Vor Monatsabschluss bestätigen!</div>`:''}`;
+  ${c.sums.tageG>0?`<div class="hint">⚠️ ${c.sums.tageG} Tag(e) stehen noch auf „geplant" – deren Stunden (${fDur(c.sums.minG)})${c.sums.offG>0?`, Offday-Pauschalen (${eur(c.sums.offG)})`:''} und Spesen (${eur(c.sums.spG)}) sind NICHT in dieser Abrechnung. Vor Monatsabschluss bestätigen!</div>`:''}`;
 }
 function updAbr(k,v){
   const a = state.months[curMonth].abrechnung;
@@ -972,10 +1010,16 @@ function renderExport() {
   <div class="panel">
     <h3>Dokumente erzeugen</h3>
     <div class="toolbar">
+      <button class="btn green" onclick="exportExcel20('${curMonth}')">📊 Stundenübersicht 2.0 (${meta.name}) als Excel</button>
       <button class="btn" onclick="exportAZE('${curMonth}')">📄 Arbeitszeiterfassung_${meta.name}_2026.html</button>
       <button class="btn" onclick="exportReiseplanDoc('${curMonth}')">🗺 Reiseplan_${meta.name}_2026.html</button>
       <button class="btn gold" onclick="exportGehalt('${curMonth}')">💶 Gehaltszahlung_${meta.name}_2026.html</button>
     </div>
+    <p style="font-size:0.78rem;color:#888;margin-top:8px;">
+      Die <b>Excel-Datei</b> hat exakt das Spaltenlayout der Firmenvorlage „Stundenübersicht 2.0 2026" –
+      inklusive Spalte <b>K „Offday"</b> und der Formel in <b>L „Berechnung Offday"</b> (${dec(OFFDAY_PAUSCHALE)} € je Offday, ab 01.08.2026).
+      Zum Abgeben entweder direkt einreichen oder den Block A5:O${4+meta.tage} in die Originaldatei kopieren.
+    </p>
   </div>
   <div class="panel">
     <h3>Cloud-Sync &amp; Datensicherung</h3>
@@ -1030,10 +1074,11 @@ function exportAZE(mid) {
   const meta = monthMeta(mid);
   const m = state.months[mid];
   const sums = monthSums(mid);
+  const offNeu = offdayNeu(mid);
   let rows = '', laender = new Set();
   m.days.forEach(d => {
     if (d.typ==='frei') return;
-    const c = dayCalc(d);
+    const c = dayCalc(d, mid);
     const date = new Date(meta.year, meta.num-1, d.tag);
     const wd = WOCHENTAGE[date.getDay()];
     const off = d.typ==='offday';
@@ -1041,11 +1086,12 @@ function exportAZE(mid) {
     const offenBadge = d.status!=='bestaetigt' ? ' <span class="badge-offday" style="background:#fff3cd;color:#856404;">OFFEN</span>' : '';
     rows += `<tr${off?' class="row-offday"':''}>
       <td><span class="wochentag">${wd}</span><span class="datum-bold">${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.${meta.year}</span></td>
-      <td>${esc(d.taetigkeit)}${off?' <span class="badge-offday">Pauschal 6 h</span>':''}${offenBadge}</td>
+      <td>${esc(d.taetigkeit)}${off?` <span class="badge-offday">${offNeu?'OFFDAY – Pauschale '+dec(OFFDAY_PAUSCHALE)+' €':'Pauschal 6 h'}</span>`:''}${offenBadge}</td>
       <td>${off?'–':esc(d.start)||'–'}</td><td>${off?'–':esc(d.ende)||'–'}</td>
       <td style="color:${off?'#888':'#dc3545'};">${off?'–':esc(d.pause)||'–'}</td>
       <td style="color:${off?'#888':'#a85400'};font-weight:600;">${off?'–':fMin(c.endeMitPause)}</td>
-      <td class="stunden"${off?' style="color:#5a1a8a;"':''}>${fDur(c.minNetto)}</td>
+      <td class="stunden"${off?' style="color:#5a1a8a;"':''}>${off&&offNeu?'–':fDur(c.minNetto)}</td>
+      ${offNeu?`<td class="stunden" style="color:#5a1a8a;">${c.offPausch>0?eur(c.offPausch):'–'}</td>`:''}
       <td>${landBadge(d.land)}</td>
       <td><span class="badge-frueh ${d.frueh==='mit'?'badge-ja':'badge-nein'}">${d.frueh==='mit'?'mit':'ohne'}</span></td>
       <td class="spesen-betrag">${eur(c.spesen)}</td>
@@ -1065,13 +1111,13 @@ function exportAZE(mid) {
 <title>Arbeitszeiterfassung – ${meta.name} ${meta.year}</title><style>${CSS_AZE}</style></head><body><div class="container">
 <header><h1>Arbeitszeiterfassung &amp; Reisekostenübersicht</h1><p>Bosch ProTour Foodtruck | 01. ${meta.name} – ${meta.tage}. ${meta.name} ${meta.year} | ${esc(getStamm().name)}</p></header>
 <div class="tabs"><button class="tab-btn active" onclick="showTab('aze',this)">Arbeitszeiterfassung</button><button class="tab-btn" onclick="showTab('auslagen',this)">Auslagen</button></div>
-<div id="aze" class="tab-content active"><table><thead><tr><th>Datum</th><th>Tätigkeit / Route</th><th>Start</th><th>Ende</th><th style="color:#ffcccc;">Pause</th><th style="color:#ffd580;">Ende mit Pause</th><th>Std. netto</th><th>Land / Spesen</th><th>Frühstück</th><th>Spesen (€)</th></tr></thead>
+<div id="aze" class="tab-content active"><table><thead><tr><th>Datum</th><th>Tätigkeit / Route</th><th>Start</th><th>Ende</th><th style="color:#ffcccc;">Pause</th><th style="color:#ffd580;">Ende mit Pause</th><th>Std. netto</th>${offNeu?'<th style="color:#e0c8f5;">Offday (€)</th>':''}<th>Land / Spesen</th><th>Frühstück</th><th>Spesen (€)</th></tr></thead>
 <tbody>${rows}</tbody>
-<tfoot><tr><td colspan="4">Gesamt (${sums.tageB+sums.tageG} Tage${sums.tageG>0?` | ${sums.tageG} noch offen`:' | alle bestätigt'})</td><td colspan="2"></td><td>${fDur(sums.minB+sums.minG)}</td><td colspan="2"></td><td>${eur(sums.spB+sums.spG)}</td></tr></tfoot></table>
+<tfoot><tr><td colspan="4">Gesamt (${sums.tageB+sums.tageG} Tage${sums.tageG>0?` | ${sums.tageG} noch offen`:' | alle bestätigt'})</td><td colspan="2"></td><td>${fDur(sums.minB+sums.minG)}</td>${offNeu?`<td>${eur(sums.offB+sums.offG)}</td>`:''}<td colspan="2"></td><td>${eur(sums.spB+sums.spG)}</td></tr></tfoot></table>
 <div class="hinweis"><strong>Spesenberechnung (BMF-Pauschalsätze):</strong><ul>${spesenLegende}
 <li>Frühstücksabzug gemäß § 9 Abs. 4a EStG (20 % des jeweiligen Tagessatzes)</li>
 <li>Tagessatz richtet sich nach dem Land, in dem die Reise <strong>endet</strong> (Übernachtungsort / letzter Tätigkeitsort vor 24 Uhr)</li>
-<li>Offday-Pauschale (6 h) = pauschale Anwesenheitszeit, keine Start/Ende-Zeiten</li>
+${offNeu?`<li><strong>Offday ab 01.08.2026:</strong> keine Arbeitszeit (Beginn/Ende/Pause/Stunden/Überstunden bleiben leer) – stattdessen Pauschale ${dec(OFFDAY_PAUSCHALE)} € je Offday (Stundenübersicht 2.0, Spalten „Offday" / „Berechnung Offday"). Die Verpflegungspauschale des Tages bleibt bestehen.</li>`:'<li>Offday-Pauschale (6 h) = pauschale Anwesenheitszeit, keine Start/Ende-Zeiten</li>'}
 <li>Pause (Standard 0:45) wird auf die Ende-Zeit aufgeschlagen („Ende mit Pause"), Std. netto = Ende − Start</li></ul></div></div>
 <div id="auslagen" class="tab-content"><table><thead><tr><th>Datum</th><th>Beschreibung</th><th>Ort</th><th>Zahlungsart</th><th>Betrag (€)</th></tr></thead>
 <tbody>${auslRows || '<tr><td colspan="5" style="color:#999;font-style:italic;">Keine Auslagen erfasst.</td></tr>'}</tbody>
@@ -1079,6 +1125,229 @@ function exportAZE(mid) {
 <div class="hinweis"><strong>Hinweis Auslagen:</strong><ul><li>Belege bitte beifügen (Quittungen, Screenshots)</li><li>Barzahlungen ohne Beleg ggf. mit Eigenbeleg dokumentieren</li></ul></div></div>
 </div><script>function showTab(id,btn){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active');btn.classList.add('active');}<\/script></body></html>`;
   download(`Arbeitszeiterfassung_${meta.name}_${meta.year}.html`, html);
+}
+
+/* ════════════════════════ EXPORT: STUNDENÜBERSICHT 2.0 (.xlsx) ════════════════════════
+   Erzeugt eine echte Excel-Datei im Spaltenlayout der Firmenvorlage
+   „Stundenübersicht 2.0 2026" (A Datum … O Betrag, inkl. K „Offday" und
+   L „Berechnung Offday"). Ohne externe Bibliothek: XLSX = ZIP aus XML-Teilen,
+   hier unkomprimiert („stored") geschrieben. */
+
+let _crcTab = null;
+function crc32(bytes) {
+  if (!_crcTab) {
+    _crcTab = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      _crcTab[n] = c >>> 0;
+    }
+  }
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) crc = (_crcTab[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8)) >>> 0;
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0, count = 0;
+  files.forEach(f => {
+    const name = enc.encode(f.name);
+    const data = enc.encode(f.data);
+    const crc = crc32(data);
+    const lh = new Uint8Array(30 + name.length);
+    const dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true); dv.setUint16(6, 0x0800, true); dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true); dv.setUint16(12, 0x2821, true);   // 01.01.2020, 00:00
+    dv.setUint32(14, crc, true); dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+    dv.setUint16(26, name.length, true); dv.setUint16(28, 0, true);
+    lh.set(name, 30);
+    parts.push(lh, data);
+
+    const cd = new Uint8Array(46 + name.length);
+    const cv = new DataView(cd.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true); cv.setUint16(12, 0, true); cv.setUint16(14, 0x2821, true);
+    cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+    cv.setUint16(28, name.length, true); cv.setUint16(30, 0, true); cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true); cv.setUint16(36, 0, true); cv.setUint32(38, 0, true);
+    cv.setUint32(42, offset, true);
+    cd.set(name, 46);
+    central.push(cd);
+
+    offset += lh.length + data.length;
+    count++;
+  });
+  const cdSize = central.reduce((a, c) => a + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
+  ev.setUint16(8, count, true); ev.setUint16(10, count, true);
+  ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true);
+  ev.setUint16(20, 0, true);
+  return new Blob([...parts, ...central, eocd], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+function xEsc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function xlSerial(y, mo, d) { return Math.round(Date.UTC(y, mo-1, d) / 86400000) + 25569; }
+/* Leere Werte MÜSSEN als echte Leerzelle geschrieben werden (nur Style, kein <is>).
+   Eine Zelle mit leerem Text ist für Excel NICHT leer – ISTLEER()/ISBLANK() in der
+   Vorlagen-Formel für Spalte O würde sonst FALSCH liefern und den Betrag verschlucken. */
+function cStr(ref, st, v) {
+  if (v == null || String(v) === '') return `<c r="${ref}" s="${st}"/>`;
+  return `<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${xEsc(v)}</t></is></c>`;
+}
+function cNum(ref, st, v)  { return `<c r="${ref}" s="${st}"><v>${v}</v></c>`; }
+function cFrm(ref, st, f)  { return `<c r="${ref}" s="${st}"><f>${xEsc(f)}</f></c>`; }
+
+/* Landbezeichnung für die Firmen-Excel (ohne App-interne Zusätze) */
+function landExcel(code) {
+  const r = rateFor(code);
+  if (!r) return code;
+  return r.label.replace(/\s*\(BMF[^)]*\)/,'').replace(/\s+Volltag$/,'').replace(/\s+An-\/Abreise$/,'').trim();
+}
+
+function exportExcel20(mid) {
+  const meta = monthMeta(mid);
+  const m = state.months[mid];
+  const sums = monthSums(mid);
+  const offNeu = offdayNeu(mid);
+  const stamm = getStamm();
+  const nameParts = String(stamm.name||'').trim().split(/\s+/);
+  const vorname = nameParts.length ? nameParts[0] : '';
+  const nachname = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+  const HEAD = ['Datum','Anreise/ ET','Einsatzort','Land','Arbeitsbeginn\nin hh:mm','Arbeitsende\nin hh:mm',
+                'Pause\nin hh:mm','Stunden','Überstunden','Begründung','Offday','Berechnung Offday',
+                'VMA\nin Euro','Frühstück\nleer: nein\nx: ja','Betrag'];
+  const COL = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'];
+
+  let xml = '';
+  xml += `<row r="1" ht="20" customHeight="1">${cStr('A1', 8, 'Arbeitszeiten & Spesen')}</row>`;
+  xml += `<row r="2">${cStr('A2', 1, 'Vorname')}${cStr('B2', 0, vorname)}</row>`;
+  xml += `<row r="3">${cStr('A3', 1, 'Nachname')}${cStr('B3', 0, nachname)}</row>`;
+  xml += `<row r="4" ht="46" customHeight="1">${HEAD.map((h,i)=>cStr(COL[i]+'4', 6, h)).join('')}</row>`;
+
+  const first = 5;
+  m.days.forEach((d, idx) => {
+    const r = first + idx;
+    const c = dayCalc(d, mid);
+    const off = d.typ === 'offday';
+    const offPausch = c.offPausch > 0;
+    let cells = cNum('A'+r, 2, xlSerial(meta.year, meta.num, d.tag));
+    if (d.typ !== 'frei') {
+      cells += cStr('B'+r, 5, d.typ==='reise' ? 'Anreise' : d.typ==='einsatz' ? 'ET' : '');
+      cells += cStr('C'+r, 5, d.taetigkeit||'');
+      cells += cStr('D'+r, 5, landExcel(d.land));
+      // Zeiten & Stunden entfallen bei Offdays nach neuer Regel
+      const sMin = offPausch ? null : pMin(d.start);
+      const eMin = offPausch ? null : pMin(d.ende);
+      const pMinV = offPausch ? null : pMin(d.pause);
+      cells += (sMin!=null) ? cNum('E'+r, 3, (sMin/1440).toFixed(10)) : cStr('E'+r, 5, '');
+      cells += (eMin!=null) ? cNum('F'+r, 3, (eMin/1440).toFixed(10)) : cStr('F'+r, 5, '');
+      cells += (pMinV!=null && pMinV>0) ? cNum('G'+r, 3, (pMinV/1440).toFixed(10)) : cStr('G'+r, 5, '');
+      cells += (!offPausch && c.minNetto!=null) ? cNum('H'+r, 4, (c.minNetto/60).toFixed(2)) : cStr('H'+r, 5, '');
+      cells += cStr('I'+r, 5, '');
+      cells += cStr('J'+r, 5, d.status!=='bestaetigt' ? 'geplant' : '');
+      cells += cStr('K'+r, 5, (off && offNeu) ? 'x' : '');
+      cells += cFrm('L'+r, 4, `IF(K${r}<>"",${OFFDAY_PAUSCHALE},"")`);
+      // VMA-Basis + Frühstücks-„x" so setzen, dass die Vorlagen-Formel in O
+      // exakt den in der App ausgewiesenen Spesenbetrag ergibt.
+      const ovr = (d.spesenOverride!=='' && d.spesenOverride!=null && !isNaN(parseFloat(d.spesenOverride)));
+      const rt = rateFor(d.land);
+      const abzug = !ovr && d.frueh==='mit' && rt && rt.fruehAbzug;
+      const vma = ovr ? parseFloat(d.spesenOverride) : (rt ? rt.rate : 0);
+      cells += cNum('M'+r, 4, vma.toFixed(2));
+      cells += cStr('N'+r, 5, abzug ? 'x' : '');
+      cells += cFrm('O'+r, 4, `IF(N${r}="x",M${r}*0.8,IF(ISBLANK(N${r}),M${r},N${r}))`);
+    }
+    xml += `<row r="${r}">${cells}</row>`;
+  });
+
+  const last = first + m.days.length - 1;
+  const sr = last + 1;
+  xml += `<row r="${sr}">${cStr('A'+sr, 9, `Summe (${sums.tageB+sums.tageG} Tage)`)}`
+      +  ['B','C','D','E','F','G'].map(cl=>cStr(cl+sr, 9, '')).join('')
+      +  cFrm('H'+sr, 7, `SUM(H${first}:H${last})`)
+      +  cStr('I'+sr, 9, '') + cStr('J'+sr, 9, '') + cStr('K'+sr, 9, '')
+      +  cFrm('L'+sr, 7, `SUM(L${first}:L${last})`)
+      +  cStr('M'+sr, 9, '') + cStr('N'+sr, 9, '')
+      +  cFrm('O'+sr, 7, `SUM(O${first}:O${last})`)
+      +  `</row>`;
+
+  const legende = [
+    `Legende: Anreise = Reisetag, ET = Einsatz-/Aktionstag. Spalte „Begründung" mit „geplant" = Tag in der App noch nicht bestätigt.`,
+    offNeu
+      ? `Offday ab 01.08.2026: Spalte K = „x", keine Stunden/Überstunden. Spalte L berechnet daraus ${dec(OFFDAY_PAUSCHALE)} € Pauschale. Die Verpflegungspauschale (VMA/Betrag) bleibt bestehen.`
+      : `Bis einschl. 07/2026: Offday = 6 h pauschal (Spalten K/L bleiben leer).`,
+    `Frühstück „x" = 20 % Abzug auf die VMA. Deutsche An-/Abreisetage (14,00 €) werden ohne Frühstücksabzug geführt.`,
+    `Erzeugt aus der Zeiterfassungs-App (FOLLOWRED) – Layout nach Firmenvorlage „Stundenübersicht 2.0 2026".`
+  ];
+  legende.forEach((t,i)=>{ xml += `<row r="${sr+2+i}">${cStr('A'+(sr+2+i), 0, t)}</row>`; });
+
+  const cols = `<cols>
+    <col min="1" max="1" width="12" customWidth="1"/><col min="2" max="2" width="11" customWidth="1"/>
+    <col min="3" max="3" width="38" customWidth="1"/><col min="4" max="4" width="14" customWidth="1"/>
+    <col min="5" max="7" width="12" customWidth="1"/><col min="8" max="9" width="11" customWidth="1"/>
+    <col min="10" max="10" width="24" customWidth="1"/><col min="11" max="11" width="9" customWidth="1"/>
+    <col min="12" max="12" width="16" customWidth="1"/><col min="13" max="13" width="11" customWidth="1"/>
+    <col min="14" max="14" width="11" customWidth="1"/><col min="15" max="15" width="11" customWidth="1"/>
+  </cols>`;
+
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+<sheetViews><sheetView tabSelected="1" workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${xml}</sheetData>
+<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>
+<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="3"><numFmt numFmtId="164" formatCode="DD\\.MM\\.YYYY"/><numFmt numFmtId="165" formatCode="HH:MM"/><numFmt numFmtId="166" formatCode="#,##0.00"/></numFmts>
+<fonts count="3"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="14"/><name val="Calibri"/><family val="2"/></font></fonts>
+<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="10">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>
+<xf numFmtId="166" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="166" fontId="1" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Standard" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+
+  const files = [
+    { name: '[Content_Types].xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
+    { name: '_rels/.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name: 'xl/workbook.xml', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xEsc(meta.name+' '+meta.year)}" sheetId="1" r:id="rId1"/></sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>` },
+    { name: 'xl/_rels/workbook.xml.rels', data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>` },
+    { name: 'xl/styles.xml', data: styles },
+    { name: 'xl/worksheets/sheet1.xml', data: sheet }
+  ];
+
+  const blob = zipStore(files);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Stundenübersicht_2.0_${nachname||'Mitarbeiter'}_${vorname}_${meta.name}_${meta.year}.xlsx`.replace(/__+/g,'_');
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
 }
 
 /* ──────────── Export: Reiseplan ──────────── */
@@ -1148,22 +1417,23 @@ function exportGehalt(mid) {
   const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
   const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Oktober';
 
+  const offNeu = offdayNeu(mid);
   let stdRows = '';
   m.days.forEach(d => {
     if (d.typ==='frei') return;
-    const cd = dayCalc(d);
+    const cd = dayCalc(d, mid);
     const date = new Date(meta.year, meta.num-1, d.tag);
     const off = d.typ==='offday';
-    const dezBetrag = (cd.dezStd||0)*c.lohn;
+    const dezBetrag = cd.offPausch>0 ? cd.offPausch : (cd.dezStd||0)*c.lohn;
     stdRows += `<tr${off?' class="row-offday"':''}>
       <td><strong>${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.</strong> <span style="font-size:0.74rem;color:#888;">${WD_KURZ[date.getDay()]}</span></td>
-      <td>${esc(d.taetigkeit)}${off?' <span class="badge b-offday">Pauschal 6 h</span>':''}${d.frueh==='mit'?' <span class="badge-frueh-ja">Frühstück</span>':''}${d.status!=='bestaetigt'?' <span class="badge b-offen">OFFEN</span>':''}</td>
+      <td>${esc(d.taetigkeit)}${off?` <span class="badge b-offday">${offNeu?'Offday-Pauschale '+dec(OFFDAY_PAUSCHALE)+' €':'Pauschal 6 h'}</span>`:''}${d.frueh==='mit'?' <span class="badge-frueh-ja">Frühstück</span>':''}${d.status!=='bestaetigt'?' <span class="badge b-offen">OFFEN</span>':''}</td>
       <td class="tc">${off?'–':esc(d.start)||'–'}</td><td class="tc">${off?'–':esc(d.ende)||'–'}</td>
       <td class="tc std-pause">${off?'–':esc(d.pause)||'–'}</td>
       <td class="tc" style="color:#856404;font-weight:600;">${off?'–':fMin(cd.endeMitPause)}</td>
-      <td class="tc std-net"${off?' style="color:#5a1a8a;"':''}>${fDur(cd.minNetto)}</td>
+      <td class="tc std-net"${off?' style="color:#5a1a8a;"':''}>${off&&offNeu?'–':fDur(cd.minNetto)}</td>
       <td class="tc">${landBadge(d.land)}</td>
-      <td class="tr">${cd.dezStd==null?'–':dec(cd.dezStd)}</td>
+      <td class="tr">${cd.offPausch>0?'<span style="color:#5a1a8a;font-weight:700;">Pauschale</span>':(cd.dezStd==null?'–':dec(cd.dezStd))}</td>
       <td class="tr fw7">${dec(dezBetrag)}</td>
       <td class="tr" style="color:#155724;font-weight:600;">${dec(cd.spesen)}</td>
     </tr>`;
@@ -1189,11 +1459,13 @@ function exportGehalt(mid) {
 <div class="sec-header">Brutto-Bezüge ${meta.name} ${meta.year}</div>
 <table><thead><tr><th style="width:80px">Lohnart</th><th>Bezeichnung</th><th class="tc" style="width:80px">Einheit</th><th class="tr" style="width:110px">Menge</th><th class="tr" style="width:110px">Faktor (€)</th><th class="tr" style="width:130px">Betrag (€)</th></tr></thead>
 <tbody><tr><td>011</td><td>Stundenlohn ${meta.name} ${meta.year} <span style="font-size:0.75rem;color:#888;">(${c.sums.tageB} Tage bestätigt${c.restStd>0?`, ${dec(c.restStd)} Std zurückgestellt → ${nextName}`:''})</span></td>
-<td class="tc">Std</td><td class="tr">${dec(c.stdAbr)}</td><td class="tr">${dec(c.lohn)}</td><td class="tr fw7 c-blue">${dec(c.brutto)}</td></tr></tbody>
+<td class="tc">Std</td><td class="tr">${dec(c.stdAbr)}</td><td class="tr">${dec(c.lohn)}</td><td class="tr fw7 c-blue">${dec(c.bruttoStd)}</td></tr>
+${c.offBetrag>0?`<tr class="row-offday"><td>012</td><td>Offday-Pauschale ${meta.name} ${meta.year} <span style="font-size:0.75rem;color:#888;">(ab 01.08.2026, ${c.offTage} bestätigte(r) Offday(s), keine Arbeitszeit)</span></td>
+<td class="tc">Tage</td><td class="tr">${c.offTage}</td><td class="tr">${dec(OFFDAY_PAUSCHALE)}</td><td class="tr fw7 c-blue">${dec(c.offBetrag)}</td></tr>`:''}</tbody>
 <tr class="row-sum"><td colspan="5">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr" style="font-size:1rem;">${eur(c.brutto)}</td></tr></table>
 <div class="sec-header">Brutto-Pool – ${meta.name} ${meta.year} inkl. Vormonat-Übertrag</div>
 <table><thead><tr><th>Position</th><th class="tr">Betrag (€)</th><th>Erläuterung</th></tr></thead><tbody>
-<tr class="row-pool"><td class="fw7">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr fw7 c-blue">${eur(c.brutto)}</td><td>${dec(c.stdAbr)} Std × ${dec(c.lohn)} €/Std</td></tr>
+<tr class="row-pool"><td class="fw7">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr fw7 c-blue">${eur(c.brutto)}</td><td>${dec(c.stdAbr)} Std × ${dec(c.lohn)} €/Std${c.offBetrag>0?` + ${c.offTage} × ${dec(OFFDAY_PAUSCHALE)} € Offday-Pauschale`:''}</td></tr>
 <tr class="row-uebertrag"><td class="fw7">+ Restbrutto Übertrag ${prevName} ${meta.year} <span class="badge b-uebertrag">Vormonat</span></td><td class="tr fw7 c-gold">+ ${eur(c.uebIn)}</td><td>Übertrag laut ${prevName}-Abrechnung</td></tr>
 <tr class="row-sum"><td class="fw7">= Brutto-Pool gesamt</td><td class="tr fw7 c-blue">${eur(c.pool)}</td><td style="font-weight:400;">Verfügbares Brutto inkl. Vormonat</td></tr>
 <tr class="row-abzug"><td class="fw7">./. Ausgezahltes Brutto (diese Abrechnung)</td><td class="tr fw7 c-red">− ${eur(c.auszBrutto)}</td><td>${c.kontoLeeren?'<b>Vollständige Auszahlung – Gehaltskonto wird geleert</b>':'Anteilige Auszahlung auf Anforderung'}</td></tr>
@@ -1224,7 +1496,8 @@ ${c.restStd>0?`<tr class="row-uebertrag"><td style="padding:10px 14px;" class="f
 </tbody></table>
 </div>
 <div class="hinweis"><strong>Berechnungsgrundlagen ${meta.name} ${meta.year}:</strong><ul>
-<li><strong>Stunden:</strong> ${dec(c.stdBest)} Std bestätigt | davon abgerechnet: ${dec(c.stdAbr)} Std × ${dec(c.lohn)} € = ${eur(c.brutto)} Brutto</li>
+<li><strong>Stunden:</strong> ${dec(c.stdBest)} Std bestätigt | davon abgerechnet: ${dec(c.stdAbr)} Std × ${dec(c.lohn)} € = ${eur(c.bruttoStd)} Brutto</li>
+${c.offBetrag>0?`<li><strong>Offday-Pauschale:</strong> ${c.offTage} bestätigte(r) Offday(s) × ${dec(OFFDAY_PAUSCHALE)} € = ${eur(c.offBetrag)} – ab 01.08.2026 werden Offdays pauschal vergütet (keine Stunden, keine Überstunden). Verpflegungspauschalen bleiben davon unberührt. Gesamt-Brutto: ${eur(c.brutto)}</li>`:''}
 <li><strong>Vormonat-Übertrag:</strong> ${prevName}-Restbrutto ${eur(c.uebIn)} | Brutto-Pool ${meta.name}: ${eur(c.pool)}</li>
 <li><strong>Auszahlung:</strong> ${eur(c.auszBrutto)} Brutto ausgezahlt | Restbrutto ${eur(c.uebertragOut)} → Übertrag ${nextName} ${meta.year}</li>
 ${c.kontoLeeren?`<li><strong>Gehaltskonto:</strong> Der komplette Brutto-Pool (${eur(c.pool)}) wird mit dieser Abrechnung ausgezahlt – das Gehaltskonto ist zum Monatsende ausgeglichen (Restbrutto 0,00 €).</li>`:''}
@@ -1235,10 +1508,11 @@ ${c.auszBrutto>3500?`<li><strong>Hinweis Lohnsteuer:</strong> Bei dieser Einmal-
 <li><strong>Spesen:</strong> ${eur(c.sums.spB)} steuerfrei § 9 Abs. 4a EStG | <strong>Auslagen:</strong> ${eur(c.sums.auslagen)} netto</li></ul></div></div>
 <div id="stunden" class="tab-content"><table><thead><tr><th>Datum</th><th>Tätigkeit / Route</th><th class="tc">Start</th><th class="tc">Ende</th><th class="tc">Pause</th><th class="tc" style="color:#ffd580;">Ende m. P.</th><th class="tc">Std. netto</th><th class="tc">Land</th><th class="tr">Dez. Std</th><th class="tr">Betrag (€)</th><th class="tr" style="color:#b8e0b8;">Spesen (€)</th></tr></thead>
 <tbody>${stdRows}</tbody>
-<tfoot><tr><td colspan="6">Gesamt (${c.sums.tageB+c.sums.tageG} Tage)</td><td class="tc">${fDur(c.sums.minB+c.sums.minG)}</td><td></td><td class="tr">${dec((c.sums.minB+c.sums.minG)/60)}</td><td class="tr">${eur((c.sums.minB+c.sums.minG)/60*c.lohn)}</td><td class="tr">${eur(c.sums.spB+c.sums.spG)}</td></tr></tfoot></table>
+<tfoot><tr><td colspan="6">Gesamt (${c.sums.tageB+c.sums.tageG} Tage)</td><td class="tc">${fDur(c.sums.minB+c.sums.minG)}</td><td></td><td class="tr">${dec((c.sums.minB+c.sums.minG)/60)}</td><td class="tr">${eur((c.sums.minB+c.sums.minG)/60*c.lohn + c.sums.offB + c.sums.offG)}</td><td class="tr">${eur(c.sums.spB+c.sums.spG)}</td></tr></tfoot></table>
 <div class="hinweis"><strong>Pausenregelung &amp; Hinweise:</strong><ul>
 <li>Reise-/Einsatztage mit Zeiten: Pause (Standard 0:45) wird auf Ende-Zeit aufgeschlagen | Dezimal: 0:15 = 0,25 | 0:30 = 0,50 | 0:45 = 0,75</li>
-<li>Offday- und Pauschal-Reisetage: 6 h pauschal, keine Start/Ende-Zeiten</li>
+${offNeu?`<li><strong>Offday ab 01.08.2026:</strong> keine Arbeitszeit, keine Überstunden – pauschal ${dec(OFFDAY_PAUSCHALE)} € je Offday (in der Spalte „Betrag" ausgewiesen)</li>
+<li>Pauschal-Reisetage: 6 h, keine Start/Ende-Zeiten</li>`:'<li>Offday- und Pauschal-Reisetage: 6 h pauschal, keine Start/Ende-Zeiten</li>'}
 <li>Frühstück „mit" = −20 % vom Spesensatz (§ 9 Abs. 4a EStG), Deutschland: kein Abzug</li></ul></div></div>
 <div id="auslagen" class="tab-content"><table><thead><tr><th>Datum</th><th>Beschreibung</th><th>Ort</th><th class="tc">Zahlungsart</th><th class="tr">Betrag (€)</th></tr></thead>
 <tbody>${auslRows || '<tr><td colspan="5" style="color:#999;font-style:italic;">Keine Auslagen erfasst.</td></tr>'}</tbody>
