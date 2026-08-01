@@ -205,7 +205,13 @@
 
 /* ════════════════════════ KONFIG ════════════════════════ */
 const STORAGE_KEY = 'followred_zeiterfassung_sommer2026_v1';
-const STUNDENLOHN_DEFAULT = 20.00;
+const STUNDENLOHN_DEFAULT = 20.00;          // bis einschl. Juli 2026
+const STUNDENLOHN_AB_AUGUST = 23.00;        // Lohnerhöhung zum 01.08.2026
+
+/* Beitragsbemessungsgrenzen 2026 (monatlich, bundeseinheitlich) –
+   greifen erst bei hohen Auszahlungen (z. B. Auflösung des Brutto-Pools). */
+const BBG_KV_PV = 5812.50;
+const BBG_RV_AV = 8450.00;
 
 const DEFAULT_RATES = [
   { code:'DE',  label:'Deutschland Volltag',    flag:'🇩🇪', rate:28.00, fruehAbzug:true },
@@ -227,10 +233,10 @@ const DEFAULT_RATES = [
 ];
 
 const SV = [
-  { key:'kv', label:'KV-Beitrag (AN-Anteil 8,79 %)', satz:0.0879 },
-  { key:'rv', label:'RV-Beitrag (9,30 %)', satz:0.0930 },
-  { key:'av', label:'AV-Beitrag (1,30 %)', satz:0.0130 },
-  { key:'pv', label:'PV-Beitrag kinderlos (2,40 %)', satz:0.0240 }
+  { key:'kv', label:'KV-Beitrag (AN-Anteil 8,79 %)', satz:0.0879, bbg:BBG_KV_PV },
+  { key:'rv', label:'RV-Beitrag (9,30 %)', satz:0.0930, bbg:BBG_RV_AV },
+  { key:'av', label:'AV-Beitrag (1,30 %)', satz:0.0130, bbg:BBG_RV_AV },
+  { key:'pv', label:'PV-Beitrag kinderlos (2,40 %)', satz:0.0240, bbg:BBG_KV_PV }
 ];
 
 /* Stammdaten (Name, IBAN, Steuer-ID, …) liegen NICHT im Code –
@@ -240,10 +246,10 @@ function getStamm() {
 }
 
 const MONTHS = [
-  { id:'juni',   name:'Juni',   num:6, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0 },
-  { id:'juli',   name:'Juli',   num:7, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0 },
-  { id:'august', name:'August', num:8, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0 },
-  { id:'september', name:'September', num:9, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0 }
+  { id:'juni',   name:'Juni',   num:6, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT },
+  { id:'juli',   name:'Juli',   num:7, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT },
+  { id:'august', name:'August', num:8, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST },
+  { id:'september', name:'September', num:9, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST }
 ];
 
 const WOCHENTAGE = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
@@ -259,6 +265,7 @@ function defaultState() {
     }
     months[m.id] = {
       days,
+      stundenlohn: m.lohn,                   // monatsabhängig (ab 08/2026: 23 €)
       auslagen: [],
       lenkzeiten: [],
       reiseplan: { hotels: [] },
@@ -267,6 +274,7 @@ function defaultState() {
         vorschuss: m.vorschussDefault,
         stundenAbrechnen: null,              // null = alle bestätigten
         bruttoAuszahlung: 3000.00,
+        kontoLeeren: false,                  // true = kompletter Brutto-Pool wird ausgezahlt
         lst: 34.00,
         notiz: ''
       }
@@ -359,11 +367,31 @@ function migrateLz() {
   });
 }
 
-function afterLoad() {
-  migrateLz();
+/* Stundenlohn ist seit 01.08.2026 monatsabhängig (20 € bis Juli, 23 € ab August).
+   Alte States haben nur den globalen state.stundenlohn – hier je Monat nachziehen. */
+function migrateLohn() {
+  if (!state || !state.months) return;
+  MONTHS.forEach(mo => {
+    const m = state.months[mo.id];
+    if (!m) return;
+    if (m.stundenlohn == null || isNaN(parseFloat(m.stundenlohn))) m.stundenlohn = mo.lohn;
+    if (m.abrechnung && m.abrechnung.kontoLeeren == null) m.abrechnung.kontoLeeren = false;
+  });
+}
+
+function updateHeaderSub() {
   const st = getStamm();
   const sub = document.getElementById('headerSub');
-  if (sub) sub.textContent = (st.name ? st.name + ' · ' : '') + 'Foodtruck Bosch ProTour · Stundenlohn ' + dec(state.stundenlohn) + ' €/Std · Sync via GitHub';
+  if (!sub) return;
+  const meta = monthMeta(curMonth);
+  sub.textContent = (st.name ? st.name + ' · ' : '') + 'Foodtruck Bosch ProTour · Stundenlohn '
+    + dec(lohnFor(curMonth)) + ' €/Std (' + (meta ? meta.name + ' ' + meta.year : '') + ') · Sync via GitHub';
+}
+
+function afterLoad() {
+  migrateLz();
+  migrateLohn();
+  updateHeaderSub();
   render();
 }
 
@@ -472,6 +500,16 @@ function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g
 function monthMeta(id) { return MONTHS.find(m=>m.id===id); }
 function rateFor(code) { return state.rates.find(r=>r.code===code); }
 
+/* Stundenlohn des jeweiligen Monats (Lohnerhöhung 20 € → 23 € zum 01.08.2026).
+   Reihenfolge: Wert im Monats-State → Vorgabe aus MONTHS → alter globaler Wert. */
+function lohnFor(mid) {
+  const m = state && state.months ? state.months[mid] : null;
+  if (m && m.stundenlohn != null && !isNaN(parseFloat(m.stundenlohn))) return parseFloat(m.stundenlohn);
+  const meta = monthMeta(mid);
+  if (meta && meta.lohn != null) return meta.lohn;
+  return (state && state.stundenlohn) ? state.stundenlohn : STUNDENLOHN_DEFAULT;
+}
+
 function dayCalc(day) {
   // Rückgabe: { minNetto, dezStd, endeMitPause, spesen }
   let minNetto = null, endeMitPause = null;
@@ -530,11 +568,17 @@ function abrechnungCalc(mid) {
   const sums = monthSums(mid);
   const stdBest = sums.minB/60;
   const stdAbr = (a.stundenAbrechnen != null && a.stundenAbrechnen !== '') ? parseFloat(a.stundenAbrechnen) : stdBest;
-  const brutto = Math.round(stdAbr * state.stundenlohn * 100)/100;
+  const lohn = lohnFor(mid);
+  const brutto = Math.round(stdAbr * lohn * 100)/100;
   const uebIn = uebertragInEffective(mid);
   const pool = Math.round((brutto + uebIn)*100)/100;
-  const auszBrutto = Math.min(parseFloat(a.bruttoAuszahlung)||0, pool);
-  const svAbz = SV.map(s=>({ ...s, betrag: Math.round(auszBrutto*s.satz*100)/100 }));
+  const kontoLeeren = !!a.kontoLeeren;
+  const auszBrutto = kontoLeeren ? pool : Math.min(parseFloat(a.bruttoAuszahlung)||0, pool);
+  // SV nur bis zur jeweiligen Beitragsbemessungsgrenze (relevant bei Pool-Auflösung)
+  const svAbz = SV.map(s=>{
+    const basis = s.bbg ? Math.min(auszBrutto, s.bbg) : auszBrutto;
+    return { ...s, basis, gedeckelt: basis < auszBrutto - 0.005, betrag: Math.round(basis*s.satz*100)/100 };
+  });
   const lst = parseFloat(a.lst)||0;
   const abzuege = svAbz.reduce((x,s)=>x+s.betrag, lst);
   const netto = Math.round((auszBrutto - abzuege)*100)/100;
@@ -543,7 +587,7 @@ function abrechnungCalc(mid) {
   const auszahlung = Math.round((nettoNachV + sums.spB + sums.auslagen)*100)/100;
   const uebertragOut = Math.round((pool - auszBrutto)*100)/100;
   const restStd = Math.max(0, stdBest - stdAbr);
-  return { sums, stdBest, stdAbr, brutto, uebIn, pool, auszBrutto, svAbz, lst, abzuege, netto, vorschuss, nettoNachV, auszahlung, uebertragOut, restStd };
+  return { sums, lohn, kontoLeeren, stdBest, stdAbr, brutto, uebIn, pool, auszBrutto, svAbz, lst, abzuege, netto, vorschuss, nettoNachV, auszahlung, uebertragOut, restStd };
 }
 
 /* ════════════════════════ RENDER: NAV ════════════════════════ */
@@ -853,9 +897,14 @@ function renderAbrechnung() {
         <td><input class="num" value="${a.stundenAbrechnen==null?'':esc(a.stundenAbrechnen)}" placeholder="${dec(c.stdBest)}" onchange="updAbr('stundenAbrechnen',this.value)"></td></tr>
       <tr><td>Brutto-Übertrag aus ${prevName} (€) ${autoUeb?'<span class="badge b-best">auto</span>':''}</td>
         <td><input class="num" value="${a.uebertragIn==null?'':esc(a.uebertragIn)}" placeholder="${dec(c.uebIn)} (auto)" onchange="updAbr('uebertragIn',this.value)"></td></tr>
-      <tr><td>Brutto-<b>Auszahlung</b> diese Abrechnung (€)</td>
-        <td><input class="num" value="${esc(a.bruttoAuszahlung)}" onchange="updAbr('bruttoAuszahlung',this.value)"></td></tr>
-      <tr><td>Lohnsteuer StKl 3 (ca., €) <span style="font-size:0.76rem;color:#888;">– bei 3.000 € Brutto ≈ 34 €</span></td>
+      <tr><td><b>Gehaltskonto komplett leeren</b>
+        <br><span style="font-size:0.76rem;color:#888;">Zahlt den gesamten Brutto-Pool aus (Restbrutto-Übertrag → ${nextName} = 0,00 €). Das Feld „Brutto-Auszahlung" wird dann ignoriert.</span></td>
+        <td><label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <input type="checkbox" style="width:20px;height:20px;" ${c.kontoLeeren?'checked':''} onchange="updAbrBool('kontoLeeren',this.checked)">
+          ${c.kontoLeeren?'ja – Pool wird aufgelöst':'nein'}</label></td></tr>
+      <tr${c.kontoLeeren?' style="opacity:0.45;"':''}><td>Brutto-<b>Auszahlung</b> diese Abrechnung (€)</td>
+        <td><input class="num" ${c.kontoLeeren?'disabled':''} value="${esc(a.bruttoAuszahlung)}" onchange="updAbr('bruttoAuszahlung',this.value)"></td></tr>
+      <tr><td>Lohnsteuer StKl 3 (ca., €) <span style="font-size:0.76rem;color:#888;">– bei 3.000 € Brutto ≈ 34 €; bei höherem Brutto neu schätzen!</span></td>
         <td><input class="num" value="${esc(a.lst)}" onchange="updAbr('lst',this.value)"></td></tr>
       <tr><td>Vorschuss-Abzug (€)</td>
         <td><input class="num" value="${esc(a.vorschuss)}" onchange="updAbr('vorschuss',this.value)"></td></tr>
@@ -865,10 +914,10 @@ function renderAbrechnung() {
   <div class="panel">
     <h3>Brutto-Pool ${meta.name} 2026</h3>
     <table class="calc">
-      <tr><td>Stundenlohn ${meta.name}: ${dec(c.stdAbr)} Std × ${dec(state.stundenlohn)} €</td><td>${eur(c.brutto)}</td></tr>
+      <tr><td>Stundenlohn ${meta.name}: ${dec(c.stdAbr)} Std × ${dec(c.lohn)} €</td><td>${eur(c.brutto)}</td></tr>
       <tr class="gold"><td>+ Restbrutto-Übertrag ${prevName}</td><td>+ ${eur(c.uebIn)}</td></tr>
       <tr class="sum"><td>= Brutto-Pool gesamt</td><td>${eur(c.pool)}</td></tr>
-      <tr class="red"><td>./. Ausgezahltes Brutto (diese Abrechnung)</td><td>− ${eur(c.auszBrutto)}</td></tr>
+      <tr class="red"><td>./. Ausgezahltes Brutto (diese Abrechnung)${c.kontoLeeren?' <span class="badge b-best">Konto geleert</span>':''}</td><td>− ${eur(c.auszBrutto)}</td></tr>
       <tr class="gold"><td>= Restbrutto <b>Übertrag → ${nextName} 2026</b></td><td>${eur(c.uebertragOut)}</td></tr>
       ${c.restStd>0?`<tr class="gold"><td>+ Nicht abgerechnete Stunden → ${nextName}</td><td>${dec(c.restStd)} Std</td></tr>`:''}
     </table>
@@ -878,10 +927,11 @@ function renderAbrechnung() {
     <h3>Steuer / SV – auf ${eur(c.auszBrutto)} Brutto</h3>
     <table class="calc">
       <tr class="red"><td>Lohnsteuer (StKl 3, ca.)</td><td>− ${eur(c.lst)}</td></tr>
-      ${c.svAbz.map(s=>`<tr class="red"><td>${s.label}</td><td>− ${eur(s.betrag)}</td></tr>`).join('')}
+      ${c.svAbz.map(s=>`<tr class="red"><td>${s.label}${s.gedeckelt?` <span class="badge b-offen">nur bis BBG ${dec(s.basis)} €</span>`:''}</td><td>− ${eur(s.betrag)}</td></tr>`).join('')}
       <tr class="sum"><td>Gesamt Abzüge</td><td>− ${eur(c.abzuege)}</td></tr>
       <tr class="green"><td><b>Netto-Verdienst</b></td><td>${eur(c.netto)}</td></tr>
     </table>
+    ${c.auszBrutto>3500?`<div class="hint" style="margin-top:10px;">⚠️ <b>Hohe Einmal-Auszahlung (${eur(c.auszBrutto)}).</b> Lohnsteuer ist eine Schätzung (StKl 3, Jahreshochrechnung) – bitte vom Lohnbüro bestätigen lassen. KV/PV sind auf die Beitragsbemessungsgrenze ${dec(BBG_KV_PV)} €/Monat gedeckelt, RV/AV auf ${dec(BBG_RV_AV)} €/Monat.</div>`:''}
   </div>
 
   <div class="panel">
@@ -901,6 +951,15 @@ function updAbr(k,v){
   const a = state.months[curMonth].abrechnung;
   if (v==null || String(v).trim()==='') a[k] = (k==='uebertragIn'||k==='stundenAbrechnen') ? null : 0;
   else a[k] = parseFloat(String(v).replace(',','.'));
+  save(); render();
+}
+function updAbrBool(k,v){
+  state.months[curMonth].abrechnung[k] = !!v;
+  save(); render();
+}
+function updLohn(mid,v){
+  const n = parseFloat(String(v).replace(',','.'));
+  if (!isNaN(n) && n > 0) state.months[mid].stundenlohn = n;
   save(); render();
 }
 
@@ -1095,7 +1154,7 @@ function exportGehalt(mid) {
     const cd = dayCalc(d);
     const date = new Date(meta.year, meta.num-1, d.tag);
     const off = d.typ==='offday';
-    const dezBetrag = (cd.dezStd||0)*state.stundenlohn;
+    const dezBetrag = (cd.dezStd||0)*c.lohn;
     stdRows += `<tr${off?' class="row-offday"':''}>
       <td><strong>${String(d.tag).padStart(2,'0')}.${String(meta.num).padStart(2,'0')}.</strong> <span style="font-size:0.74rem;color:#888;">${WD_KURZ[date.getDay()]}</span></td>
       <td>${esc(d.taetigkeit)}${off?' <span class="badge b-offday">Pauschal 6 h</span>':''}${d.frueh==='mit'?' <span class="badge-frueh-ja">Frühstück</span>':''}${d.status!=='bestaetigt'?' <span class="badge b-offen">OFFEN</span>':''}</td>
@@ -1130,19 +1189,19 @@ function exportGehalt(mid) {
 <div class="sec-header">Brutto-Bezüge ${meta.name} ${meta.year}</div>
 <table><thead><tr><th style="width:80px">Lohnart</th><th>Bezeichnung</th><th class="tc" style="width:80px">Einheit</th><th class="tr" style="width:110px">Menge</th><th class="tr" style="width:110px">Faktor (€)</th><th class="tr" style="width:130px">Betrag (€)</th></tr></thead>
 <tbody><tr><td>011</td><td>Stundenlohn ${meta.name} ${meta.year} <span style="font-size:0.75rem;color:#888;">(${c.sums.tageB} Tage bestätigt${c.restStd>0?`, ${dec(c.restStd)} Std zurückgestellt → ${nextName}`:''})</span></td>
-<td class="tc">Std</td><td class="tr">${dec(c.stdAbr)}</td><td class="tr">${dec(state.stundenlohn)}</td><td class="tr fw7 c-blue">${dec(c.brutto)}</td></tr></tbody>
+<td class="tc">Std</td><td class="tr">${dec(c.stdAbr)}</td><td class="tr">${dec(c.lohn)}</td><td class="tr fw7 c-blue">${dec(c.brutto)}</td></tr></tbody>
 <tr class="row-sum"><td colspan="5">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr" style="font-size:1rem;">${eur(c.brutto)}</td></tr></table>
 <div class="sec-header">Brutto-Pool – ${meta.name} ${meta.year} inkl. Vormonat-Übertrag</div>
 <table><thead><tr><th>Position</th><th class="tr">Betrag (€)</th><th>Erläuterung</th></tr></thead><tbody>
-<tr class="row-pool"><td class="fw7">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr fw7 c-blue">${eur(c.brutto)}</td><td>${dec(c.stdAbr)} Std × ${dec(state.stundenlohn)} €/Std</td></tr>
+<tr class="row-pool"><td class="fw7">Gesamt-Brutto ${meta.name} ${meta.year}</td><td class="tr fw7 c-blue">${eur(c.brutto)}</td><td>${dec(c.stdAbr)} Std × ${dec(c.lohn)} €/Std</td></tr>
 <tr class="row-uebertrag"><td class="fw7">+ Restbrutto Übertrag ${prevName} ${meta.year} <span class="badge b-uebertrag">Vormonat</span></td><td class="tr fw7 c-gold">+ ${eur(c.uebIn)}</td><td>Übertrag laut ${prevName}-Abrechnung</td></tr>
 <tr class="row-sum"><td class="fw7">= Brutto-Pool gesamt</td><td class="tr fw7 c-blue">${eur(c.pool)}</td><td style="font-weight:400;">Verfügbares Brutto inkl. Vormonat</td></tr>
-<tr class="row-abzug"><td class="fw7">./. Ausgezahltes Brutto (diese Abrechnung)</td><td class="tr fw7 c-red">− ${eur(c.auszBrutto)}</td><td>Anteilige Auszahlung auf Anforderung</td></tr>
-<tr class="row-uebertrag"><td class="fw7">= Restbrutto <span class="badge b-uebertrag">Übertrag → ${nextName} ${meta.year}</span></td><td class="tr fw7 c-gold">${eur(c.uebertragOut)}</td><td>Wird in ${nextName} ${meta.year} abgerechnet</td></tr></tbody></table>
+<tr class="row-abzug"><td class="fw7">./. Ausgezahltes Brutto (diese Abrechnung)</td><td class="tr fw7 c-red">− ${eur(c.auszBrutto)}</td><td>${c.kontoLeeren?'<b>Vollständige Auszahlung – Gehaltskonto wird geleert</b>':'Anteilige Auszahlung auf Anforderung'}</td></tr>
+<tr class="row-uebertrag"><td class="fw7">= Restbrutto <span class="badge b-uebertrag">Übertrag → ${nextName} ${meta.year}</span></td><td class="tr fw7 c-gold">${eur(c.uebertragOut)}</td><td>${c.kontoLeeren?'Gehaltskonto ausgeglichen – kein Übertrag':'Wird in '+nextName+' '+meta.year+' abgerechnet'}</td></tr></tbody></table>
 <div class="sec-header">Steuer / Sozialversicherung – auf ${eur(c.auszBrutto)} Brutto</div>
 <table><thead><tr><th style="width:60px">Stkl.</th><th>Bezeichnung</th><th class="tr" style="width:120px">Basis (€)</th><th class="tr" style="width:80px">Satz</th><th class="tr" style="width:130px">Abzug (€)</th></tr></thead><tbody>
 <tr class="row-abzug"><td>${STAMM.stkl}</td><td>Lohnsteuer <span style="font-size:0.75rem;color:#888;">(ca., gem. StKl ${STAMM.stkl}, PAP 2026)</span></td><td class="tr">${dec(c.auszBrutto)}</td><td class="tr">–</td><td class="tr fw7 c-red">− ${dec(c.lst)}</td></tr>
-${c.svAbz.map(s=>`<tr class="row-abzug"><td></td><td>${s.label}</td><td class="tr">${dec(c.auszBrutto)}</td><td class="tr">${(s.satz*100).toLocaleString('de-DE',{minimumFractionDigits:2})} %</td><td class="tr fw7 c-red">− ${dec(s.betrag)}</td></tr>`).join('')}
+${c.svAbz.map(s=>`<tr class="row-abzug"><td></td><td>${s.label}${s.gedeckelt?' <span class="badge b-offen">Beitragsbemessungsgrenze</span>':''}</td><td class="tr">${dec(s.basis)}</td><td class="tr">${(s.satz*100).toLocaleString('de-DE',{minimumFractionDigits:2})} %</td><td class="tr fw7 c-red">− ${dec(s.betrag)}</td></tr>`).join('')}
 </tbody><tr class="row-sum"><td colspan="4">Gesamt Abzüge Steuer / SV</td><td class="tr">− ${eur(c.abzuege)}</td></tr>
 <tr class="row-sum-green"><td colspan="4">Netto-Verdienst (von ${eur(c.auszBrutto)} Brutto)</td><td class="tr">${eur(c.netto)}</td></tr></table>
 <div class="sec-header">Netto-Bezüge / Steuerfreie Erstattungen</div>
@@ -1165,15 +1224,18 @@ ${c.restStd>0?`<tr class="row-uebertrag"><td style="padding:10px 14px;" class="f
 </tbody></table>
 </div>
 <div class="hinweis"><strong>Berechnungsgrundlagen ${meta.name} ${meta.year}:</strong><ul>
-<li><strong>Stunden:</strong> ${dec(c.stdBest)} Std bestätigt | davon abgerechnet: ${dec(c.stdAbr)} Std × ${dec(state.stundenlohn)} € = ${eur(c.brutto)} Brutto</li>
+<li><strong>Stunden:</strong> ${dec(c.stdBest)} Std bestätigt | davon abgerechnet: ${dec(c.stdAbr)} Std × ${dec(c.lohn)} € = ${eur(c.brutto)} Brutto</li>
 <li><strong>Vormonat-Übertrag:</strong> ${prevName}-Restbrutto ${eur(c.uebIn)} | Brutto-Pool ${meta.name}: ${eur(c.pool)}</li>
 <li><strong>Auszahlung:</strong> ${eur(c.auszBrutto)} Brutto ausgezahlt | Restbrutto ${eur(c.uebertragOut)} → Übertrag ${nextName} ${meta.year}</li>
+${c.kontoLeeren?`<li><strong>Gehaltskonto:</strong> Der komplette Brutto-Pool (${eur(c.pool)}) wird mit dieser Abrechnung ausgezahlt – das Gehaltskonto ist zum Monatsende ausgeglichen (Restbrutto 0,00 €).</li>`:''}
 ${c.vorschuss>0?`<li><strong>Vorschuss:</strong> ${eur(c.vorschuss)} – wird vom Netto-Verdienst abgezogen</li>`:''}
-<li><strong>KV 2026:</strong> 17,58 % Gesamtsatz, AN-Anteil 8,79 % | <strong>RV:</strong> AN 9,30 % | <strong>AV:</strong> AN 1,30 % | <strong>PV kinderlos:</strong> AN 2,40 %</li>
+<li><strong>Stundenlohn:</strong> ${dec(c.lohn)} €/Std ${meta.num>=8?'(Lohnerhöhung von 20,00 € auf 23,00 € zum 01.08.2026)':'(20,00 €/Std bis einschl. 07/2026)'}</li>
+<li><strong>KV 2026:</strong> 17,58 % Gesamtsatz, AN-Anteil 8,79 % | <strong>RV:</strong> AN 9,30 % | <strong>AV:</strong> AN 1,30 % | <strong>PV kinderlos:</strong> AN 2,40 % | Beitragsbemessungsgrenzen 2026: KV/PV ${dec(BBG_KV_PV)} €, RV/AV ${dec(BBG_RV_AV)} € pro Monat</li>
+${c.auszBrutto>3500?`<li><strong>Hinweis Lohnsteuer:</strong> Bei dieser Einmal-Auszahlung ist die ausgewiesene Lohnsteuer eine Schätzung (StKl 3, Jahreshochrechnung) – die verbindliche Berechnung erfolgt durch das Lohnbüro; zu viel einbehaltene Lohnsteuer wird über den Lohnsteuerjahresausgleich / die Einkommensteuererklärung zurückerstattet.</li>`:''}
 <li><strong>Spesen:</strong> ${eur(c.sums.spB)} steuerfrei § 9 Abs. 4a EStG | <strong>Auslagen:</strong> ${eur(c.sums.auslagen)} netto</li></ul></div></div>
 <div id="stunden" class="tab-content"><table><thead><tr><th>Datum</th><th>Tätigkeit / Route</th><th class="tc">Start</th><th class="tc">Ende</th><th class="tc">Pause</th><th class="tc" style="color:#ffd580;">Ende m. P.</th><th class="tc">Std. netto</th><th class="tc">Land</th><th class="tr">Dez. Std</th><th class="tr">Betrag (€)</th><th class="tr" style="color:#b8e0b8;">Spesen (€)</th></tr></thead>
 <tbody>${stdRows}</tbody>
-<tfoot><tr><td colspan="6">Gesamt (${c.sums.tageB+c.sums.tageG} Tage)</td><td class="tc">${fDur(c.sums.minB+c.sums.minG)}</td><td></td><td class="tr">${dec((c.sums.minB+c.sums.minG)/60)}</td><td class="tr">${eur((c.sums.minB+c.sums.minG)/60*state.stundenlohn)}</td><td class="tr">${eur(c.sums.spB+c.sums.spG)}</td></tr></tfoot></table>
+<tfoot><tr><td colspan="6">Gesamt (${c.sums.tageB+c.sums.tageG} Tage)</td><td class="tc">${fDur(c.sums.minB+c.sums.minG)}</td><td></td><td class="tr">${dec((c.sums.minB+c.sums.minG)/60)}</td><td class="tr">${eur((c.sums.minB+c.sums.minG)/60*c.lohn)}</td><td class="tr">${eur(c.sums.spB+c.sums.spG)}</td></tr></tfoot></table>
 <div class="hinweis"><strong>Pausenregelung &amp; Hinweise:</strong><ul>
 <li>Reise-/Einsatztage mit Zeiten: Pause (Standard 0:45) wird auf Ende-Zeit aufgeschlagen | Dezimal: 0:15 = 0,25 | 0:30 = 0,50 | 0:45 = 0,75</li>
 <li>Offday- und Pauschal-Reisetage: 6 h pauschal, keine Start/Ende-Zeiten</li>
@@ -1201,8 +1263,12 @@ function renderEinstellungen() {
   return `
   <div class="hint"><b>Spesensätze (BMF-Auslandstagegelder, Volltag):</b> Vorbefüllt mit den gängigen Sätzen – bitte gegen die aktuelle BMF-Tabelle 2026 prüfen und bei Bedarf anpassen. Änderungen wirken sofort auf alle Monate.</div>
   <div class="panel">
-    <h3>Stundenlohn</h3>
-    <input class="num" value="${esc(state.stundenlohn)}" onchange="state.stundenlohn=parseFloat(this.value.replace(',','.'))||20; save(); render();"> €/Std
+    <h3>Stundenlohn je Monat</h3>
+    <div class="hint">Zum <b>01.08.2026</b> gilt ein neuer Stundenlohn von <b>23,00 €/Std</b> (vorher 20,00 €). Juni + Juli bleiben auf 20,00 € – auch die Rest-Stunden aus diesen Monaten werden mit 20,00 € abgerechnet.</div>
+    <table class="calc">
+      ${MONTHS.map(mo=>`<tr><td>${mo.name} ${mo.year}</td>
+        <td><input class="num" value="${esc(lohnFor(mo.id))}" onchange="updLohn('${mo.id}',this.value)"> €/Std</td></tr>`).join('')}
+    </table>
   </div>
   <div class="panel">
     <h3>Spesensätze</h3>
@@ -1540,6 +1606,7 @@ function renderLenkzeiten() {
 function render() {
   if (!state) return;
   renderNav();
+  updateHeaderSub();
   const main = document.getElementById('main');
   switch(curSub) {
     case 'zeit': main.innerHTML = renderZeit(); break;
