@@ -237,6 +237,8 @@ const DEFAULT_RATES = [
   { code:'CH',  label:'Schweiz',                flag:'🇨🇭', rate:64.00, fruehAbzug:true },
   { code:'AT',  label:'Österreich',             flag:'🇦🇹', rate:50.00, fruehAbzug:true },
   { code:'SI',  label:'Slowenien',              flag:'🇸🇮', rate:38.00, fruehAbzug:true },
+  { code:'RS',  label:'Serbien (BMF – bitte prüfen)',   flag:'🇷🇸', rate:27.00, fruehAbzug:true },
+  { code:'TR',  label:'Türkei (BMF – bitte prüfen)',    flag:'🇹🇷', rate:24.00, fruehAbzug:true },
   { code:'CZ',  label:'Tschechien',             flag:'🇨🇿', rate:32.00, fruehAbzug:true },
   { code:'SE',  label:'Schweden (BMF – bitte prüfen)',  flag:'🇸🇪', rate:50.00, fruehAbzug:true },
   { code:'FI',  label:'Finnland (BMF – bitte prüfen)',  flag:'🇫🇮', rate:50.00, fruehAbzug:true }
@@ -259,7 +261,9 @@ const MONTHS = [
   { id:'juni',   name:'Juni',   num:6, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT },
   { id:'juli',   name:'Juli',   num:7, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT },
   { id:'august', name:'August', num:8, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST },
-  { id:'september', name:'September', num:9, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST }
+  { id:'september', name:'September', num:9, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST },
+  { id:'oktober',  name:'Oktober',  num:10, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST },
+  { id:'november', name:'November', num:11, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST }
 ];
 
 const WOCHENTAGE = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
@@ -368,6 +372,21 @@ function logout() {
   showLogin();
 }
 
+/* Neue Monate (z.B. Oktober/November) oder neue Länder-Sätze kommen mit einem
+   App-Update dazu – alte States aus dem Repo haben sie noch nicht. */
+function migrateMonths() {
+  if (!state) return;
+  if (!state.months) state.months = {};
+  const def = defaultState();
+  MONTHS.forEach(mo => {
+    if (!state.months[mo.id]) { state.months[mo.id] = def.months[mo.id]; dirty = true; }
+  });
+  if (!Array.isArray(state.rates)) state.rates = JSON.parse(JSON.stringify(DEFAULT_RATES));
+  DEFAULT_RATES.forEach(r => {
+    if (!state.rates.some(x => x.code === r.code)) { state.rates.push(JSON.parse(JSON.stringify(r))); dirty = true; }
+  });
+}
+
 function migrateLz() {
   if (!state || !state.months) return;
   MONTHS.forEach(mo => {
@@ -399,6 +418,7 @@ function updateHeaderSub() {
 }
 
 function afterLoad() {
+  migrateMonths();
   migrateLz();
   migrateLohn();
   updateHeaderSub();
@@ -916,7 +936,7 @@ function renderAbrechnung() {
   const c = abrechnungCalc(curMonth);
   const idx = MONTHS.findIndex(x=>x.id===curMonth);
   const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
-  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Oktober';
+  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Dezember';
   const autoUeb = a.uebertragIn == null;
 
   return `
@@ -1415,7 +1435,7 @@ function exportGehalt(mid) {
   const c = abrechnungCalc(mid);
   const idx = MONTHS.findIndex(x=>x.id===mid);
   const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
-  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Oktober';
+  const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Dezember';
 
   const offNeu = offdayNeu(mid);
   let stdRows = '';
