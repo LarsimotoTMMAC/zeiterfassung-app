@@ -257,9 +257,13 @@ function getStamm() {
   return state && state.stamm ? state.stamm : { name:'', adresse:'', pnr:'', geb:'', stkl:'', eintritt:'', steuerId:'', svNr:'', kk:'', bank:'', iban:'' };
 }
 
+/* Juni + Juli sind abgerechnet und am 16.09.2026 aus der Reiter-Leiste genommen
+   (Lars arbeitet am Handy, die Leiste war zu lang). Ihre Daten stehen unverändert
+   in state.json – gespeichert wird immer der komplette State, nichts wird beschnitten.
+   Zum Wiederanzeigen die beiden Zeilen einfach wieder in MONTHS eintragen:
+   { id:'juni', name:'Juni', num:6, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT },
+   { id:'juli', name:'Juli', num:7, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT }, */
 const MONTHS = [
-  { id:'juni',   name:'Juni',   num:6, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT },
-  { id:'juli',   name:'Juli',   num:7, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_DEFAULT },
   { id:'august', name:'August', num:8, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST },
   { id:'september', name:'September', num:9, year:2026, tage:30, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST },
   { id:'oktober',  name:'Oktober',  num:10, year:2026, tage:31, uebertragInDefault:null, vorschussDefault:0, lohn:STUNDENLOHN_AB_AUGUST },
@@ -313,7 +317,14 @@ let dirty = false;       // es gibt Änderungen, die noch nicht auf GitHub sind
 let pushTimer = null;
 let pushing = false;
 
-let curMonth = 'juni';
+/* Startmonat: der laufende Monat, sonst der erste verfügbare Reiter.
+   Vorher stand hier fest 'juni' – nach dem Entfernen eines Monats aus MONTHS
+   wäre monthMeta() dann undefined gewesen und das Rendern abgebrochen. */
+let curMonth = (function () {
+  const n = new Date();
+  const lauf = MONTHS.find(m => m.year === n.getFullYear() && m.num === n.getMonth() + 1);
+  return (lauf || MONTHS[0]).id;
+})();
 let curSub = 'zeit';
 
 function setChip(mode, text) {
@@ -935,14 +946,12 @@ function renderAbrechnung() {
   const a = m.abrechnung;
   const c = abrechnungCalc(curMonth);
   const idx = MONTHS.findIndex(x=>x.id===curMonth);
-  const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
+  const prevName = idx>0 ? MONTHS[idx-1].name : 'Juli';
   const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Dezember';
   const autoUeb = a.uebertragIn == null;
 
   return `
-  <div class="hint">${meta.id==='juni'
-    ? '<b>Übertrag aus Mai:</b> Restbrutto und Vorschuss sind aus der Mai-Abrechnung vorbefüllt (siehe Eingabefelder) – der Vorschuss wird in dieser Abrechnung abgezogen.'
-    : `<b>Übertrag aus ${prevName}:</b> wird automatisch aus der ${prevName}-Abrechnung übernommen (Feld leer lassen) oder manuell überschreiben.`}</div>
+  <div class="hint"><b>Übertrag aus ${prevName}:</b> wird automatisch aus der ${prevName}-Abrechnung übernommen (Feld leer lassen) oder manuell überschreiben.</div>
 
   <div class="panel">
     <h3>Eingaben – hier legst du fest</h3>
@@ -1434,7 +1443,7 @@ function exportGehalt(mid) {
   const m = state.months[mid];
   const c = abrechnungCalc(mid);
   const idx = MONTHS.findIndex(x=>x.id===mid);
-  const prevName = idx>0 ? MONTHS[idx-1].name : 'Mai';
+  const prevName = idx>0 ? MONTHS[idx-1].name : 'Juli';
   const nextName = idx<MONTHS.length-1 ? MONTHS[idx+1].name : 'Dezember';
 
   const offNeu = offdayNeu(mid);
@@ -1558,7 +1567,7 @@ function renderEinstellungen() {
   <div class="hint"><b>Spesensätze (BMF-Auslandstagegelder, Volltag):</b> Vorbefüllt mit den gängigen Sätzen – bitte gegen die aktuelle BMF-Tabelle 2026 prüfen und bei Bedarf anpassen. Änderungen wirken sofort auf alle Monate.</div>
   <div class="panel">
     <h3>Stundenlohn je Monat</h3>
-    <div class="hint">Zum <b>01.08.2026</b> gilt ein neuer Stundenlohn von <b>23,00 €/Std</b> (vorher 20,00 €). Juni + Juli bleiben auf 20,00 € – auch die Rest-Stunden aus diesen Monaten werden mit 20,00 € abgerechnet.</div>
+    <div class="hint">Zum <b>01.08.2026</b> gilt ein neuer Stundenlohn von <b>23,00 €/Std</b> (vorher 20,00 €). Juni + Juli sind abgerechnet und seit 16.09.2026 nicht mehr als Reiter sichtbar; ihre Daten bleiben gespeichert. Rest-Stunden aus diesen Monaten werden weiterhin mit 20,00 € abgerechnet.</div>
     <table class="calc">
       ${MONTHS.map(mo=>`<tr><td>${mo.name} ${mo.year}</td>
         <td><input class="num" value="${esc(lohnFor(mo.id))}" onchange="updLohn('${mo.id}',this.value)"> €/Std</td></tr>`).join('')}
