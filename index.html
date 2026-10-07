@@ -1277,7 +1277,8 @@ function exportExcel20(mid) {
       cells += cStr('D'+r, 5, landExcel(d.land));
       // Zeiten & Stunden entfallen bei Offdays nach neuer Regel
       const sMin = offPausch ? null : pMin(d.start);
-      const eMin = offPausch ? null : pMin(d.ende);
+      // Arbeitsende inkl. Pause (unbezahlt): Pause verlängert den Tag, Stunden bleiben Ende − Start
+      const eMin = offPausch ? null : (c.endeMitPause!=null ? c.endeMitPause : pMin(d.ende));
       const pMinV = offPausch ? null : pMin(d.pause);
       cells += (sMin!=null) ? cNum('E'+r, 3, (sMin/1440).toFixed(10)) : cStr('E'+r, 5, '');
       cells += (eMin!=null) ? cNum('F'+r, 3, (eMin/1440).toFixed(10)) : cStr('F'+r, 5, '');
